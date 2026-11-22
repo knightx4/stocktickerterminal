@@ -4,17 +4,58 @@ A 64x32 LED desk display that shows live market data. It runs on an Adafruit
 Matrix Portal S3. A small server on Vercel renders the screens, and the device
 fetches and draws them. Design choices are in [docs/decisions.md](docs/decisions.md).
 
+- **Settings page:** https://dad-ticker-blush.vercel.app (password protected)
+- **Vercel project:** `dad-ticker`, which deploys automatically on every push to
+  this branch
+- **Database:** the `ticker` schema in the `personal-dashboard` Supabase project
+
 ```
 firmware/   Arduino (PlatformIO) code for the Matrix Portal S3
-docs/       decisions and notes
-server/     (milestone 3) Vercel functions that render frames
+server/     Vercel functions, the settings page, and screen rendering
+docs/       decisions.md (why) and protocol.md (device/server format)
 ```
+
+## Server setup
+
+Set these environment variables in the Vercel project (Settings, then
+Environment Variables), then redeploy:
+
+| Variable | What it is | Status |
+|---|---|---|
+| `DEVICE_TOKEN` | Shared secret the device sends | set |
+| `ADMIN_PASSWORD` | Settings page password | set |
+| `SUPABASE_URL` | `https://asjztutnqxbecruvyrbj.supabase.co` | set |
+| `SUPABASE_SERVICE_ROLE_KEY` | Supabase, then Project Settings, then API Keys, then the secret / `service_role` key | **you add** |
+| `FINNHUB_KEY` | Free key from finnhub.io | **you add** |
+| `FRED_KEY` | Free key from fred.stlouisfed.org (My Account, then API Keys) | **you add** |
+| `TWELVEDATA_KEY` | Optional fallback, free key from twelvedata.com | optional |
+
+Without the keys, everything still works on demo data: the screens show
+"DEMO DATA", and settings can't be saved until the Supabase key is set.
+
+Run it locally:
+
+```bash
+cd server && npm test
+```
+
+```bash
+cd server && ADMIN_PASSWORD=test DEVICE_TOKEN=dev LOCAL_DB=./local-db.json node tools/dev.js
+```
+
+`node tools/preview.js` writes PNG previews of every screen.
 
 ## Ticker firmware
 
-1. Set `SERVER_URL` and `DEVICE_TOKEN` in `firmware/src/config.h`.
-2. Flash it: `cd firmware`, then `pio run -e ticker -t upload`. `ticker` is the
-   default env, so a plain `pio run -t upload` also works.
+1. Copy `firmware/src/secrets.example.h` to `firmware/src/secrets.h` and paste
+   in the device token. `secrets.h` is gitignored because this repo is public.
+   `SERVER_URL` is already set in `firmware/src/config.h`.
+2. Flash it:
+
+   ```bash
+   cd firmware && pio run -e ticker -t upload
+   ```
+
 3. On first boot, join the `Ticker-Setup` Wi-Fi network from a phone and pick
    the home network.
 
@@ -23,6 +64,16 @@ Hold a button while pressing **Reset**:
 - **DOWN** toggles the FM6126A panel init.
 
 The bundle parser has a desktop test: `firmware/tools/run_host_test.sh`.
+
+### Firmware updates over the air
+
+1. Raise `FW_VERSION` in `config.h` and build with `pio run -e ticker`.
+2. Upload `firmware/.pio/build/ticker/firmware.bin` somewhere with an HTTPS
+   link, for example a GitHub Release asset.
+3. On the settings page, open Device, then Firmware update. Enter the version,
+   the URL, and the MD5 (`md5sum firmware.bin`), then save.
+4. Within 5 minutes the device installs it. If the new version can't fetch
+   screens, it rolls back to the old one after a reset.
 
 ## Milestone 1: panel test
 

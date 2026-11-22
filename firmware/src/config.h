@@ -4,7 +4,7 @@
 
 // ---- Fill these in before flashing -------------------------------------
 // Base URL of the Vercel deployment (no trailing slash).
-#define SERVER_URL "https://stockticker-dad.vercel.app"
+#define SERVER_URL "https://dad-ticker-blush.vercel.app"
 // DEVICE_TOKEN lives in secrets.h, which is gitignored because this repo is
 // public. Copy secrets.example.h to secrets.h and paste in the token.
 #if __has_include("secrets.h")
