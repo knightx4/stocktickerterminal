@@ -130,11 +130,20 @@ export async function getQuotes(symbols, ttlSeconds) {
 }
 
 // Single lookup for the admin page's "add symbol" check.
+// Returns { quote, name } or null if the symbol doesn't exist.
 export async function lookupSymbol(symbol) {
   const p = quoteProvider();
-  if (p === "demo") return demoQuote(symbol);
-  if (p === "finnhub") return finnhubQuote(symbol);
-  return (await twelveDataQuotes([symbol]))[symbol] ?? null;
+  if (p === "demo") return { quote: demoQuote(symbol), name: "" };
+  if (p === "finnhub") {
+    const profileUrl = `https://finnhub.io/api/v1/stock/profile2?symbol=${encodeURIComponent(symbol)}&token=${finnhubKey()}`;
+    const [quote, profile] = await Promise.all([
+      finnhubQuote(symbol),
+      getJson(profileUrl).catch(() => ({})),
+    ]);
+    return quote ? { quote, name: profile?.name || "" } : null;
+  }
+  const quote = (await twelveDataQuotes([symbol]))[symbol];
+  return quote ? { quote, name: "" } : null;
 }
 
 // ---------------------------------------------------------------- S&P 500 level

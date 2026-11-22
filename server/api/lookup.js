@@ -10,8 +10,8 @@ export default async function handler(req, res) {
     .slice(0, 12);
   if (!symbol) return json(res, { error: "missing symbol" }, 400);
   try {
-    const quote = await lookupSymbol(symbol);
-    json(res, quote ? { symbol, quote } : { error: `${symbol} not found` }, quote ? 200 : 404);
+    const found = await lookupSymbol(symbol);
+    json(res, found ? { symbol, ...found } : { error: `${symbol} not found` }, found ? 200 : 404);
   } catch (e) {
     json(res, { error: e.message }, 502);
   }

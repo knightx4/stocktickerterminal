@@ -288,7 +288,8 @@ $("addForm").onsubmit = async (e) => {
   const data = await res.json();
   if (!res.ok) { msg.className = "msg err"; msg.textContent = data.error || "Lookup failed"; return; }
   draft.symbols.push({ symbol: data.symbol, label: "" });
-  msg.className = "msg good"; msg.textContent = `Added ${data.symbol} (${data.quote.price.toFixed(2)}). Remember to save.`;
+  msg.className = "msg good";
+  msg.textContent = `Added ${data.symbol}${data.name ? ` (${data.name})` : ""} at $${data.quote.price.toFixed(2)}. Check it's the right company, then save.`;
   $("newSym").value = ""; changed(); renderAll();
 };
 

@@ -62,10 +62,11 @@ export function marketStatus(date = new Date()) {
 }
 
 // How often the device should fetch, and how long quotes stay fresh.
+// Outside market hours prices barely move, but a short interval means edits
+// on the settings page show up within ~2 minutes. Quotes stay cached longer
+// (see bundle.js), so this costs almost nothing.
 export function pollSeconds(status) {
-  if (status === "open") return 60;
-  if (status === "pre" || status === "after") return 300;
-  return 600; // keeps settings changes showing within ~10 minutes overnight
+  return status === "open" ? 60 : 120;
 }
 
 // "22:00" -> 1320
