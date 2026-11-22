@@ -8,7 +8,7 @@ import { cacheGet, cacheSet, dbConfigured } from "./db.js";
 import { HISTORY } from "../data/sp500-monthly.js";
 
 // ETFs used for the day's index moves, with the label shown on screen.
-export const INDEX_ETFS = { SPY: "S&P", DIA: "DOW", QQQ: "NASDAQ" };
+export const INDEX_ETFS = { SPY: "S&P", DIA: "DOW", QQQ: "NDX" }; // QQQ tracks the Nasdaq-100 (NDX)
 
 // Accept the common misspelling too, so a typo in Vercel doesn't silently mean demo data.
 const finnhubKey = () => process.env.FINNHUB_KEY || process.env.FINHUB_KEY;

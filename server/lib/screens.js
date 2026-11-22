@@ -119,7 +119,7 @@ export function indicesScreen(ctx) {
   const rows = [9, 17, 25];
   Object.entries(INDEX_ETFS).forEach(([etf, name], i) => {
     const y = rows[i];
-    bg.text(1, y + 1, name, TICKER_AMBER, "small");
+    bg.text(1, y, name, TICKER_AMBER);
     const q = ctx.quotes[etf];
     if (!q) {
       bg.text(W - textWidth("--"), y, "--", C.grey);
