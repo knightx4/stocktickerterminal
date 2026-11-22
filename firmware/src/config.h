@@ -15,13 +15,14 @@
 
 // Bump this for every firmware release you publish for OTA. The server's
 // /api/ping tells the device about newer versions; it only updates upward.
-#define FW_VERSION 1
+#define FW_VERSION 2
 
 // ---- Timing (rarely need changing) ---------------------------------------
 namespace cfg {
 constexpr uint32_t kHttpTimeoutMs = 10000;            // connect + read timeout
 constexpr uint32_t kPingIntervalMs = 5UL * 60 * 1000; // heartbeat / OTA check
-constexpr uint32_t kSaveIntervalMs = 15UL * 60 * 1000; // max flash write rate for cached bundle
+constexpr uint32_t kSaveIntervalMs = 60UL * 60 * 1000; // max flash write rate for cached bundle
+constexpr uint8_t kSaveMaxBrightness = 64;            // only save while dimmed (night); flash writes glitch the panel
 constexpr uint32_t kRetryMinMs = 15000;               // first retry after a failed fetch
 constexpr uint32_t kDefaultPollMs = 60000;            // until the server tells us otherwise
 constexpr uint32_t kOfflineBeforePortalMs = 10UL * 60 * 1000; // disconnected this long -> open portal

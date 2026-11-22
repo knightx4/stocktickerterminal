@@ -30,6 +30,7 @@ struct Bundle {
   uint8_t* data = nullptr;  // owned raw bytes (free with freeBundle)
   size_t size = 0;
   uint32_t crc = 0;         // of the raw bytes, to detect changes
+  uint32_t contentCrc = 0;  // of the screens only (excludes the header's clock time)
 
   uint8_t screenCount = 0;
   uint16_t pollSeconds = 60;

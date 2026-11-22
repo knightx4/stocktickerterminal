@@ -93,6 +93,9 @@ bool parseBundle(uint8_t* data, size_t size, Bundle& out, String& error) {
   b.data = data;
   b.size = size;
   b.crc = esp_rom_crc32_le(0, data, size);
+  // The 24-byte header carries the server time, which changes on every fetch;
+  // the screens after it only change when the content does.
+  b.contentCrc = esp_rom_crc32_le(0, data + kBundleHeaderBytes, size - kBundleHeaderBytes);
   out = b;
   return true;
 }

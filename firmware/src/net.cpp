@@ -86,7 +86,7 @@ void loadCache() {
     String err;
     if (parseBundle(data, size, *b, err)) {
       b->fromCache = true;
-      savedCrc = b->crc;
+      savedCrc = b->contentCrc;
       swapIn(b);
       Serial.printf("[net] Loaded cached bundle (%u bytes, %u screens)\n", size, b->screenCount);
       data = nullptr;
@@ -99,12 +99,19 @@ void loadCache() {
   f.close();
 }
 
+// Writing to flash pauses the panel's refresh timer (its interrupt can't run
+// while flash is busy), which shows as a brief burst of garbled colour. So we
+// save only when the screens actually changed, at most every kSaveIntervalMs,
+// and only while the panel is dimmed for the night - unless there is no saved
+// copy at all yet.
 void maybeSaveCache() {
   if (!ffatOk) return;
   if (lastSaveMs && millis() - lastSaveMs < cfg::kSaveIntervalMs) return;
   // Only this task frees bundles, so `current` stays valid while we write it.
   Bundle* b = current;
-  if (!b || b->fromCache || b->crc == savedCrc) return;
+  if (!b || b->fromCache || b->contentCrc == savedCrc) return;
+  bool haveCopy = savedCrc != 0;
+  if (haveCopy && b->brightness > cfg::kSaveMaxBrightness) return;
   lastSaveMs = millis();
   File f = FFat.open("/bundle.tmp", "w");
   if (!f) return;
@@ -114,7 +121,7 @@ void maybeSaveCache() {
     FFat.remove(kCachePath);
     ok = FFat.rename("/bundle.tmp", kCachePath);
   }
-  if (ok) savedCrc = b->crc;
+  if (ok) savedCrc = b->contentCrc;
   Serial.printf("[net] Saved bundle to flash: %s\n", ok ? "ok" : "FAILED");
 }
 
@@ -160,8 +167,13 @@ bool fetchBundle() {
   netStatus.lastSuccessMs = millis();
   lastError = "";
 
-  // A freshly OTA-updated image proves itself by fetching data once.
-  esp_ota_mark_app_valid_cancel_rollback();
+  // A freshly OTA-updated image proves itself by fetching data once. Only do
+  // it once per boot: it can write to flash, which disturbs the panel.
+  static bool markedValid = false;
+  if (!markedValid) {
+    esp_ota_mark_app_valid_cancel_rollback();
+    markedValid = true;
+  }
   return true;
 }
 
