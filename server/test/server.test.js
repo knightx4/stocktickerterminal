@@ -4,7 +4,7 @@ import { marketStatus, utcOffsetMinutes, pollSeconds } from "../lib/hours.js";
 import { sanitizeConfig, DEFAULT_CONFIG } from "../lib/config.js";
 import { buildScreens, encodeBundle, brightnessFor } from "../lib/bundle.js";
 import { decodeBundle, composite, clockText } from "../public/decode.js";
-import { fmtPct, fmtPrice, fmtGainPct } from "../lib/screens.js";
+import { fmtPct, fmtPrice, fmtGainPct, sinceLabel } from "../lib/screens.js";
 
 const at = (iso) => new Date(iso);
 
@@ -84,4 +84,5 @@ test("number formatting", () => {
   assert.equal(fmtPrice(1234.5), "1,234.50");
   assert.equal(fmtPrice(43210.9), "43,211");
   assert.equal(fmtGainPct(7177 / 107.76), "+6,560%");
+  assert.equal(sinceLabel("1968-11-27"), "SINCE NOV 27 1968");
 });

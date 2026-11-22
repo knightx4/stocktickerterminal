@@ -18,6 +18,14 @@ export function fmtPct(p) {
   return `${sign}${a >= 10 ? a.toFixed(1) : a.toFixed(2)}%`;
 }
 
+// "1968-11-27" -> "SINCE NOV 27 1968" (exactly 64 px), or a shorter form if needed.
+export function sinceLabel(ymd) {
+  const [y, m, d] = ymd.split("-").map(Number);
+  const mon = ["JAN","FEB","MAR","APR","MAY","JUN","JUL","AUG","SEP","OCT","NOV","DEC"][m - 1];
+  const long = `SINCE ${mon} ${d} ${y}`;
+  return textWidth(long, "small") <= W ? long : `SINCE ${m}/${d}/${String(y).slice(2)}`;
+}
+
 // Total gain as a percent with thousands separators, e.g. 66.6x -> "+6,560%".
 export function fmtGainPct(multiple) {
   const pct = Math.round((multiple - 1) * 100);
@@ -151,8 +159,9 @@ export function since1968Screen(ctx) {
 
   // Headline: total price gain since the base date, e.g. "+6,560%".
   const multiple = latest.value / baseValue;
-  bg.text(1, 0, "S&P SINCE '68", C.amber, "small");
-  bg.text(1, 7, fmtGainPct(multiple), multiple >= 1 ? C.green : C.red);
+  bg.text(0, 0, sinceLabel(baseDate), C.amber, "small");
+  const w = bg.text(1, 7, fmtGainPct(multiple), multiple >= 1 ? C.green : C.red);
+  if (w + 5 + textWidth("S&P", "small") <= W) bg.text(W - textWidth("S&P", "small"), 9, "S&P", C.grey, "small");
   return { id: "since1968", bg };
 }
 
