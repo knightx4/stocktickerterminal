@@ -69,13 +69,17 @@ export function tickerScreen(ctx) {
     return { id: "ticker", bg, clock: CLOCK };
   }
 
-  const gap = 14;
+  // Each stock is a compact two-line block:
+  //   AAPL -1.90%     symbol (big) with the % change (small) right after it
+  //   342.56 ▼        price (big) with a colored arrow right after it
+  const gap = 12;
   const blocks = items.map(({ symbol, label, q }) => {
     const name = label || symbol;
     const pct = fmtPct(q.pct);
-    const line1 = textWidth(name) + 4 + 6 + textWidth(pct); // name, arrow, pct
-    const line2 = textWidth(fmtPrice(q.price));
-    return { name, pct, price: fmtPrice(q.price), q, width: Math.max(line1, line2) };
+    const price = fmtPrice(q.price);
+    const line1 = textWidth(name) + 3 + textWidth(pct, "small");
+    const line2 = textWidth(price) + 3 + 5; // price, gap, arrow
+    return { name, pct, price, q, width: Math.max(line1, line2) };
   });
   const total = blocks.reduce((w, b) => w + b.width + gap, 0);
   const strip = new Canvas(Math.max(total, W), stripH);
@@ -83,12 +87,14 @@ export function tickerScreen(ctx) {
   let x = 0;
   for (const b of blocks) {
     const color = changeColor(b.q.pct);
-    const cx = x + strip.text(x, 1, b.name, C.white) + 4;
-    if (Math.abs(b.q.pct) > 0.005) strip.arrow(cx, 3, b.q.pct > 0, color);
-    strip.text(cx + 6, 1, b.pct, color);
-    strip.text(x, 12, b.price, rgb(200, 200, 200));
+    // line 1: symbol, then the small % aligned to the bottom of the big letters
+    const nameW = strip.text(x, 2, b.name, C.white);
+    strip.text(x + nameW + 3, 4, b.pct, color, "small");
+    // line 2: price, then the arrow
+    const priceW = strip.text(x, 13, b.price, rgb(200, 200, 200));
+    if (Math.abs(b.q.pct) > 0.005) strip.arrow(x + priceW + 3, 15, b.q.pct > 0, color);
     // small dot separator in the gap
-    strip.set(x + b.width + gap / 2, 8, C.dim);
+    strip.set(x + b.width + gap / 2, 9, C.dim);
     x += b.width + gap;
   }
 
