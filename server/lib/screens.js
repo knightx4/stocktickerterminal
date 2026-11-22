@@ -32,6 +32,9 @@ export function fmtGainPct(multiple) {
   return `${pct >= 0 ? "+" : "-"}${Math.abs(pct).toLocaleString("en-US")}%`;
 }
 
+// Classic stock-ticker yellow-orange for symbols.
+const TICKER_AMBER = rgb(255, 176, 0);
+
 const changeColor = (pct) => (pct > 0.005 ? C.green : pct < -0.005 ? C.red : C.grey);
 
 const STATUS_LABEL = {
@@ -88,10 +91,10 @@ export function tickerScreen(ctx) {
   for (const b of blocks) {
     const color = changeColor(b.q.pct);
     // line 1: symbol, then the small % aligned to the bottom of the big letters
-    const nameW = strip.text(x, 2, b.name, C.white);
+    const nameW = strip.text(x, 2, b.name, TICKER_AMBER);
     strip.text(x + nameW + 3, 4, b.pct, color, "small");
-    // line 2: price, then the arrow
-    const priceW = strip.text(x, 13, b.price, rgb(200, 200, 200));
+    // line 2: price (colored by the day's move), then the arrow
+    const priceW = strip.text(x, 13, b.price, color);
     if (Math.abs(b.q.pct) > 0.005) strip.arrow(x + priceW + 3, 15, b.q.pct > 0, color);
     // small dot separator in the gap
     strip.set(x + b.width + gap / 2, 9, C.dim);
