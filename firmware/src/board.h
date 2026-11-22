@@ -8,8 +8,10 @@ namespace board {
 constexpr uint16_t kWidth = 64;
 constexpr uint16_t kHeight = 32;
 
-// HUB75 connector: R1 G1 B1 R2 G2 B2
-inline uint8_t rgbPins[] = {42, 41, 40, 38, 39, 37};
+// HUB75 connector, in Protomatter's order: R1 G1 B1 R2 G2 B2.
+// Adafruit's default is {42, 41, 40, 38, 39, 37}, but this Waveshare panel has
+// green and blue swapped (confirmed with the panel test), so G and B trade pins.
+inline uint8_t rgbPins[] = {42, 40, 41, 38, 37, 39};
 // Row address lines A B C D (a 32-row, 1/16-scan panel needs 4; E=21 is for 64-row panels)
 inline uint8_t addrPins[] = {45, 36, 48, 35};
 constexpr uint8_t kClockPin = 2;
