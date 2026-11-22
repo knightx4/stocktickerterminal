@@ -25,13 +25,21 @@ Environment Variables), then redeploy:
 | `DEVICE_TOKEN` | Shared secret the device sends | set |
 | `ADMIN_PASSWORD` | Settings page password | set |
 | `SUPABASE_URL` | `https://asjztutnqxbecruvyrbj.supabase.co` | set |
-| `SUPABASE_SERVICE_ROLE_KEY` | Supabase, then Project Settings, then API Keys, then the secret / `service_role` key | **you add** |
-| `FINNHUB_KEY` | Free key from finnhub.io | **you add** |
-| `FRED_KEY` | Free key from fred.stlouisfed.org (My Account, then API Keys) | **you add** |
+| `SUPABASE_KEY` | The project's publishable key | set |
+| `TICKER_DB_SECRET` | Unlocks the `ticker.get_row` / `put_row` database functions; only its SHA-256 is stored in `ticker.secret` | set |
+| `FINNHUB_KEY` | Free key from finnhub.io | set |
+| `FRED_KEY` | Free key from fred.stlouisfed.org (My Account, then API Keys) | set |
 | `TWELVEDATA_KEY` | Optional fallback, free key from twelvedata.com | optional |
 
 Without the keys, everything still works on demo data: the screens show
-"DEMO DATA", and settings can't be saved until the Supabase key is set.
+"DEMO DATA", and settings can't be saved until the database is configured.
+
+To rotate `TICKER_DB_SECRET`, run this in the Supabase SQL editor, then update
+the Vercel variable to match and redeploy:
+
+```sql
+update ticker.secret set sha256 = encode(extensions.digest('NEW-SECRET', 'sha256'), 'hex');
+```
 
 Run it locally:
 

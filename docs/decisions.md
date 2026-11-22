@@ -12,8 +12,10 @@ Revised 2026-11-22: a settings page replaced the Google Sheet idea.
   messages, the firm progress, the Since 1968 settings, brightness and night
   hours, and firmware updates. A live LED preview renders your unsaved edits.
 - Settings are stored as one JSON row in the `ticker` schema of the existing
-  `personal-dashboard` Supabase project, so it costs nothing extra. Only the
-  server's service key can touch that schema.
+  `personal-dashboard` Supabase project, so it costs nothing extra. The
+  server connects with the publishable key; the tables are closed to it, and
+  two database functions open them only when the server presents
+  `TICKER_DB_SECRET`. No service-role key is needed.
 - The page also shows the device's last heartbeat, Wi-Fi signal, firmware
   version and last error, so you can check on it from New York.
 

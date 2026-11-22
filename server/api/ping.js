@@ -1,7 +1,7 @@
 // POST /api/ping?t=DEVICE_TOKEN  - device heartbeat; replies with a firmware offer.
 import { isDevice, deny, json, readJson } from "../lib/auth.js";
 import { loadConfig } from "../lib/config.js";
-import { dbUpsert, dbConfigured } from "../lib/db.js";
+import { dbPut, dbConfigured } from "../lib/db.js";
 
 export default async function handler(req, res) {
   if (req.method !== "POST" || !isDevice(req)) return deny(res);
@@ -16,7 +16,7 @@ export default async function handler(req, res) {
     info = { err: "bad heartbeat body" };
   }
   if (dbConfigured()) {
-    await dbUpsert("device", { id: "main", last_seen: new Date().toISOString(), info }).catch((e) =>
+    await dbPut("device", "main", info).catch((e) =>
       console.error("heartbeat save failed", e.message)
     );
   }

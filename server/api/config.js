@@ -14,7 +14,7 @@ export default async function handler(req, res) {
     }
     const [config, device] = await Promise.all([
       loadConfig({ fresh: true }),
-      dbConfigured() ? dbGet("device", "id=eq.main").catch(() => null) : null,
+      dbConfigured() ? dbGet("device", "main").catch(() => null) : null,
     ]);
     json(res, {
       config,

@@ -1,5 +1,5 @@
 // Settings: defaults, validation, and load/save in Supabase (ticker.config).
-import { dbGet, dbUpsert } from "./db.js";
+import { dbGet, dbPut } from "./db.js";
 
 export const SCREEN_IDS = ["ticker", "since1968", "indices", "message", "firm"];
 
@@ -120,7 +120,7 @@ let cachedAt = 0;
 export async function loadConfig({ fresh = false } = {}) {
   if (!fresh && cached && Date.now() - cachedAt < 30_000) return cached;
   try {
-    const row = await dbGet("config", "id=eq.1");
+    const row = await dbGet("config", 1);
     cached = sanitizeConfig(row?.data && Object.keys(row.data).length ? row.data : DEFAULT_CONFIG);
     cachedAt = Date.now();
   } catch (e) {
@@ -132,7 +132,7 @@ export async function loadConfig({ fresh = false } = {}) {
 
 export async function saveConfig(input) {
   const clean = sanitizeConfig(input);
-  await dbUpsert("config", { id: 1, data: clean, updated_at: new Date().toISOString() });
+  await dbPut("config", 1, clean);
   cached = clean;
   cachedAt = Date.now();
   return clean;
