@@ -6,3 +6,4 @@ node_modules/
 firmware/src/secrets.h
 server/local-db.json
 server/preview/
+flash/
