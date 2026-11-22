@@ -10,6 +10,9 @@ import { HISTORY } from "../data/sp500-monthly.js";
 // ETFs used for the day's index moves, with the label shown on screen.
 export const INDEX_ETFS = { SPY: "S&P", DIA: "DOW", QQQ: "NASDAQ" };
 
+// Accept the common misspelling too, so a typo in Vercel doesn't silently mean demo data.
+const finnhubKey = () => process.env.FINNHUB_KEY || process.env.FINHUB_KEY;
+
 const mem = new Map(); // per-instance cache: key -> { data, updatedAt }
 
 async function cached(key, ttlMs, fetcher) {
@@ -49,7 +52,7 @@ async function getJson(url) {
 
 async function finnhubQuote(symbol) {
   const j = await getJson(
-    `https://finnhub.io/api/v1/quote?symbol=${encodeURIComponent(symbol)}&token=${process.env.FINNHUB_KEY}`
+    `https://finnhub.io/api/v1/quote?symbol=${encodeURIComponent(symbol)}&token=${finnhubKey()}`
   );
   if (!j || !j.c) return null; // unknown symbol
   return { price: j.c, change: j.d ?? 0, pct: j.dp ?? 0, prevClose: j.pc ?? 0, t: j.t ?? 0 };
@@ -85,7 +88,7 @@ function demoQuote(symbol) {
 }
 
 export function quoteProvider() {
-  if (process.env.FINNHUB_KEY) return "finnhub";
+  if (finnhubKey()) return "finnhub";
   if (process.env.TWELVEDATA_KEY) return "twelvedata";
   return "demo";
 }
