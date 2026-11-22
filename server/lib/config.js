@@ -17,7 +17,7 @@ export const DEFAULT_CONFIG = {
   ],
   messages: [{ text: "HAPPY\nBIRTHDAY\nDAD!", color: "#ffc83c" }],
   firm: { title: "FIRM AUM", value: "$0M", goal: "$100M", percent: 0, color: "#3c8cff" },
-  since1968: { baseDate: "1968-11-27", baseValue: 107.76, scale: "linear", showDividends: true },
+  since1968: { baseDate: "1968-11-27", baseValue: 107.76, scale: "linear" },
   display: {
     timezone: "America/Chicago",
     dayBrightness: 70,
@@ -82,7 +82,6 @@ export function sanitizeConfig(input) {
       baseDate: /^\d{4}-\d{2}-\d{2}$/.test(s68.baseDate || "") ? s68.baseDate : D.since1968.baseDate,
       baseValue: num(s68.baseValue, 0.01, 1e6, D.since1968.baseValue),
       scale: s68.scale === "log" ? "log" : "linear",
-      showDividends: bool(s68.showDividends, true),
     },
     display: {
       timezone: isValidTimeZone(d.timezone) ? d.timezone : D.display.timezone,

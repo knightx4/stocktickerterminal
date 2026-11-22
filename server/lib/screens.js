@@ -18,8 +18,10 @@ export function fmtPct(p) {
   return `${sign}${a >= 10 ? a.toFixed(1) : a.toFixed(2)}%`;
 }
 
-export function fmtMultiple(x) {
-  return x >= 100 ? `${Math.round(x)}x` : `${x.toFixed(1)}x`;
+// Total gain as a percent with thousands separators, e.g. 66.6x -> "+6,560%".
+export function fmtGainPct(multiple) {
+  const pct = Math.round((multiple - 1) * 100);
+  return `${pct >= 0 ? "+" : "-"}${Math.abs(pct).toLocaleString("en-US")}%`;
 }
 
 const changeColor = (pct) => (pct > 0.005 ? C.green : pct < -0.005 ? C.red : C.grey);
@@ -115,15 +117,15 @@ export function indicesScreen(ctx) {
 // ---------------------------------------------------------------- since 1968
 
 export function since1968Screen(ctx) {
-  const { baseDate, baseValue, scale, showDividends } = ctx.config.since1968;
+  const { baseDate, baseValue, scale } = ctx.config.since1968;
   const { months, latest } = ctx.sp500;
   const bg = new Canvas();
 
-  // Chart: monthly levels from the base month onward, full width, rows 19-31.
+  // Chart: monthly levels from the base month onward, full width, rows 17-31.
   const startYm = baseDate.slice(0, 7);
   const series = months.filter((m) => m[0] >= startYm).map((m) => m[1]);
   series.push(latest.value);
-  const top = 19;
+  const top = 17;
   const height = H - top;
   const f = scale === "log" ? Math.log : (v) => v;
   const lo = f(Math.min(...series));
@@ -147,32 +149,11 @@ export function since1968Screen(ctx) {
     bg.set(x, yTop, C.green);
   });
 
-  // Headline numbers
+  // Headline: total price gain since the base date, e.g. "+6,560%".
   const multiple = latest.value / baseValue;
   bg.text(1, 0, "S&P SINCE '68", C.amber, "small");
-  // Big multiple, e.g. "71.2" in the 5x7 font followed by a small "x".
-  const w = bg.text(1, 7, fmtMultiple(multiple).slice(0, -1), C.white);
-  bg.text(1 + w + 2, 9, "x", C.white, "small");
-
-  if (showDividends) {
-    const trMultiple = multiple * dividendFactor(months, startYm);
-    if (trMultiple) {
-      const tr = fmtMultiple(trMultiple);
-      bg.text(W - textWidth(tr, "small"), 7, tr, C.gold, "small");
-      bg.text(W - textWidth("W/DIV", "small"), 13, "W/DIV", rgb(150, 110, 30), "small");
-    }
-  }
+  bg.text(1, 7, fmtGainPct(multiple), multiple >= 1 ? C.green : C.red);
   return { id: "since1968", bg };
-}
-
-// How much reinvested dividends multiply the price-only gain, from the
-// history's total-return index (months after it are treated as price-only).
-export function dividendFactor(months, startYm) {
-  const withTr = months.filter((m) => m.length > 2);
-  const start = withTr.find((m) => m[0] >= startYm);
-  const end = withTr[withTr.length - 1];
-  if (!start || !end) return null;
-  return end[2] / start[2] / (end[1] / start[1]);
 }
 
 // ---------------------------------------------------------------- messages
