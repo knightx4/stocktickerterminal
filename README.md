@@ -10,6 +10,20 @@ docs/       decisions and notes
 server/     (milestone 3) Vercel functions that render frames
 ```
 
+## Ticker firmware
+
+1. Set `SERVER_URL` and `DEVICE_TOKEN` in `firmware/src/config.h`.
+2. Flash it: `cd firmware`, then `pio run -e ticker -t upload`. `ticker` is the
+   default env, so a plain `pio run -t upload` also works.
+3. On first boot, join the `Ticker-Setup` Wi-Fi network from a phone and pick
+   the home network.
+
+Hold a button while pressing **Reset**:
+- **UP** opens Wi-Fi setup again.
+- **DOWN** toggles the FM6126A panel init.
+
+The bundle parser has a desktop test: `firmware/tools/run_host_test.sh`.
+
 ## Milestone 1: panel test
 
 ### Flash it
@@ -25,7 +39,7 @@ server/     (milestone 3) Vercel functions that render frames
    ```
 
    ```bash
-   pio run -t upload
+   pio run -e paneltest -t upload
    ```
 
    If upload can't find the board, put it in bootloader mode: hold **Boot**,

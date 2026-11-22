@@ -2,20 +2,20 @@
 
 Decided 2026-11-22. Each section gives the choice, then the reason.
 
-## 1. Stock list: a Google Sheet
+## 1. Settings: a password-protected web page (Supabase + Vercel)
 
-One sheet, shared with Dad, published to the web as CSV. The server reads the
-CSV and caches it for 5 minutes.
+Revised 2026-11-22: a settings page replaced the Google Sheet idea.
 
-- Both of you can edit it from a phone, and he already knows spreadsheets.
-- No login code, no database, and no edit page to build or secure.
-- Later screens fit as extra tabs: `symbols`, `message` (birthday notes),
-  `firm` (the manually entered progress numbers).
-- If the sheet is unreachable or a row is malformed, the server keeps using the
-  last good copy.
-
-The only data it exposes is a list of tickers. A custom edit page can come
-later if the sheet feels clunky.
+- The page lives at the Vercel URL (`server/public/index.html`). It works on a
+  phone or computer and is protected by one password (`ADMIN_PASSWORD`).
+- Edit the stocks (add, label, reorder), the screens (on/off, order), the
+  messages, the firm progress, the Since 1968 settings, brightness and night
+  hours, and firmware updates. A live LED preview renders your unsaved edits.
+- Settings are stored as one JSON row in the `ticker` schema of the existing
+  `personal-dashboard` Supabase project, so it costs nothing extra. Only the
+  server's service key can touch that schema.
+- The page also shows the device's last heartbeat, Wi-Fi signal, firmware
+  version and last error, so you can check on it from New York.
 
 ## 2. Market data: Finnhub, plus FRED for indices and history
 
@@ -82,6 +82,10 @@ need changing.
   This gets set up in milestone 5.
 
 ## 6. Wi-Fi setup: captive portal (WiFiManager)
+
+Note: while the setup network is up, WiFiManager stops trying the saved
+network. The device alternates 10 minutes of retrying with 5 minutes of
+portal.
 
 - On first boot, or after 5 minutes without reaching any saved network, the
   device starts an access point called `Ticker-Setup`. The panel shows

@@ -1,0 +1,429 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex">
+<meta name="theme-color" content="#0d0f12">
+<title>Ticker Settings</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><rect width='16' height='16' rx='3' fill='%230d0f12'/><path d='M3 11l3-3 2 2 5-5' stroke='%2300e63c' stroke-width='2' fill='none'/></svg>">
+<style>
+  :root {
+    --bg: #0d0f12; --card: #16191e; --line: #262a31; --text: #e8eaed; --muted: #8b929c;
+    --accent: #00c853; --accent-ink: #04130a; --red: #ff5252; --amber: #ffb300;
+    --radius: 12px;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font: 15px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    padding-bottom: 96px;
+  }
+  main { max-width: 680px; margin: 0 auto; padding: 16px; }
+  h1 { font-size: 20px; margin: 4px 0 2px; }
+  h2 { font-size: 15px; margin: 0 0 12px; letter-spacing: .02em; }
+  .sub { color: var(--muted); font-size: 13px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px; margin: 14px 0; }
+  .row { display: flex; gap: 8px; align-items: center; }
+  .row + .row { margin-top: 8px; }
+  .grow { flex: 1; min-width: 0; }
+  label.field { display: block; margin: 10px 0 4px; color: var(--muted); font-size: 13px; }
+  input, select, textarea {
+    width: 100%; background: #0f1216; color: var(--text); border: 1px solid var(--line);
+    border-radius: 8px; padding: 10px; font: inherit;
+  }
+  input[type=color] { padding: 2px; height: 42px; width: 52px; flex: none; }
+  input[type=checkbox] { width: 22px; height: 22px; accent-color: var(--accent); flex: none; }
+  input[type=range] { padding: 0; accent-color: var(--accent); }
+  textarea { min-height: 70px; resize: vertical; font-family: ui-monospace, Menlo, monospace; text-transform: uppercase; }
+  button {
+    font: inherit; border-radius: 8px; border: 1px solid var(--line); background: #1f242b;
+    color: var(--text); padding: 9px 12px; cursor: pointer; flex: none;
+  }
+  button:disabled { opacity: .4; cursor: default; }
+  button.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 600; }
+  button.icon { width: 38px; padding: 9px 0; }
+  .sym { font-family: ui-monospace, Menlo, monospace; font-weight: 600; width: 78px; flex: none; }
+  .label-in { width: 92px; flex: none; text-transform: uppercase; }
+  .pill { display: inline-block; border-radius: 99px; padding: 2px 10px; font-size: 12px; font-weight: 600; }
+  .ok { background: #0f3d22; color: #69f0ae; } .bad { background: #4a1414; color: #ff8a80; } .warn { background: #4a3a0a; color: #ffd54f; }
+  .msg { font-size: 13px; margin-top: 8px; min-height: 1em; }
+  .msg.err { color: var(--red); } .msg.good { color: #69f0ae; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0 12px; }
+  @media (max-width: 420px) { .grid2 { grid-template-columns: 1fr; } .label-in { width: 70px; } }
+  .preview-wrap { background: #000; border-radius: 10px; padding: 10px; border: 1px solid #222; }
+  canvas { width: 100%; height: auto; display: block; image-rendering: pixelated; }
+  .tabs { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 10px; }
+  .tabs button { padding: 6px 10px; font-size: 13px; }
+  .tabs button.on { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+  .savebar {
+    position: fixed; left: 0; right: 0; bottom: 0; padding: 12px 16px calc(12px + env(safe-area-inset-bottom));
+    background: rgba(13,15,18,.94); border-top: 1px solid var(--line); backdrop-filter: blur(8px);
+  }
+  .savebar .row { max-width: 680px; margin: 0 auto; }
+  dl { display: grid; grid-template-columns: auto 1fr; gap: 4px 14px; margin: 0; font-size: 14px; }
+  dt { color: var(--muted); } dd { margin: 0; overflow-wrap: anywhere; }
+  details summary { cursor: pointer; color: var(--muted); }
+  #login { max-width: 360px; margin: 18vh auto 0; }
+  .hidden { display: none !important; }
+</style>
+</head>
+<body>
+
+<main id="login" class="hidden">
+  <div class="card">
+    <h1>Ticker settings</h1>
+    <p class="sub">Enter the settings password.</p>
+    <form id="loginForm">
+      <input id="pw" type="password" autocomplete="current-password" placeholder="Password" required>
+      <div class="row" style="margin-top:10px"><button class="primary grow" type="submit">Sign in</button></div>
+      <div id="loginMsg" class="msg err"></div>
+    </form>
+  </div>
+</main>
+
+<main id="app" class="hidden">
+  <div class="row">
+    <div class="grow">
+      <h1>Ticker</h1>
+      <div class="sub" id="deviceLine">Loading…</div>
+    </div>
+    <span id="devicePill" class="pill warn">…</span>
+  </div>
+
+  <section class="card">
+    <h2>Preview</h2>
+    <div class="preview-wrap"><canvas id="led" width="640" height="320"></canvas></div>
+    <div class="tabs" id="screenTabs"></div>
+    <div class="msg sub" id="previewNote">Shows your unsaved edits. The device picks up saved changes on its next refresh.</div>
+  </section>
+
+  <section class="card">
+    <h2>Stocks</h2>
+    <div id="symbols"></div>
+    <form class="row" id="addForm" style="margin-top:12px">
+      <input id="newSym" class="grow" placeholder="Add symbol, e.g. TSLA" autocapitalize="characters" autocomplete="off">
+      <button class="primary" type="submit">Add</button>
+    </form>
+    <div id="addMsg" class="msg"></div>
+    <p class="sub">The label is optional. It replaces the symbol on screen (up to 8 characters).</p>
+  </section>
+
+  <section class="card">
+    <h2>Screens</h2>
+    <p class="sub" style="margin-top:-6px">Turn screens on or off and set their order. The buttons on the device cycle through them.</p>
+    <div id="screens"></div>
+  </section>
+
+  <section class="card">
+    <h2>Messages</h2>
+    <p class="sub" style="margin-top:-6px">Each message is its own screen (when Messages is on). Up to 3 short lines of 10 letters stay still; longer text scrolls.</p>
+    <div id="messages"></div>
+    <button id="addMessage" style="margin-top:10px">+ Add message</button>
+  </section>
+
+  <section class="card">
+    <h2>Firm progress</h2>
+    <div class="grid2">
+      <div><label class="field">Title</label><input data-bind="firm.title" maxlength="16"></div>
+      <div><label class="field">Bar color</label><input type="color" data-bind="firm.color"></div>
+      <div><label class="field">Current value</label><input data-bind="firm.value" maxlength="10" placeholder="$412M"></div>
+      <div><label class="field">Goal</label><input data-bind="firm.goal" maxlength="12" placeholder="$500M"></div>
+    </div>
+    <label class="field">Progress: <span data-show="firm.percent"></span>%</label>
+    <input type="range" min="0" max="100" data-bind="firm.percent" data-type="number">
+  </section>
+
+  <section class="card">
+    <h2>Since 1968</h2>
+    <div class="grid2">
+      <div><label class="field">Start date</label><input type="date" data-bind="since1968.baseDate"></div>
+      <div><label class="field">S&amp;P 500 close that day</label><input type="number" step="0.01" data-bind="since1968.baseValue" data-type="number"></div>
+      <div><label class="field">Chart scale</label>
+        <select data-bind="since1968.scale"><option value="linear">Linear (dramatic)</option><option value="log">Log (even growth)</option></select></div>
+      <div><label class="field">&nbsp;</label>
+        <div class="row"><input type="checkbox" data-bind="since1968.showDividends"><span>Show multiple with dividends</span></div></div>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>Display</h2>
+    <label class="field">Daytime brightness: <span data-show="display.dayBrightness"></span>%</label>
+    <input type="range" min="1" max="100" data-bind="display.dayBrightness" data-type="number">
+    <label class="field">Night brightness: <span data-show="display.nightBrightness"></span>% (0 = off)</label>
+    <input type="range" min="0" max="100" data-bind="display.nightBrightness" data-type="number">
+    <div class="grid2">
+      <div><label class="field">Night starts</label><input type="time" data-bind="display.nightStart"></div>
+      <div><label class="field">Night ends</label><input type="time" data-bind="display.nightEnd"></div>
+      <div><label class="field">Time zone (clock and night hours)</label>
+        <select data-bind="display.timezone">
+          <option value="America/Chicago">Central</option><option value="America/New_York">Eastern</option>
+          <option value="America/Denver">Mountain</option><option value="America/Phoenix">Arizona</option>
+          <option value="America/Los_Angeles">Pacific</option>
+        </select></div>
+      <div><label class="field">Auto-advance screens (seconds, 0 = off)</label><input type="number" min="0" max="3600" data-bind="display.dwellSeconds" data-type="number"></div>
+    </div>
+    <label class="field">Scroll speed: <span data-show="display.scrollSpeed"></span> px/s</label>
+    <input type="range" min="5" max="60" data-bind="display.scrollSpeed" data-type="number">
+    <div class="row" style="margin-top:12px"><input type="checkbox" data-bind="display.clock24h"><span>24-hour clock</span></div>
+    <div class="row"><input type="checkbox" data-bind="display.doubleTap"><span>Double-tap the case to change screens</span></div>
+  </section>
+
+  <section class="card">
+    <h2>Device</h2>
+    <dl id="deviceInfo"></dl>
+    <details style="margin-top:14px">
+      <summary>Firmware update (advanced)</summary>
+      <p class="sub">Upload a new <code>firmware.bin</code> somewhere reachable over HTTPS, set a version higher than the one installed, and save. The device checks every 5 minutes, installs it, and rolls back on its own if the new version can't fetch screens.</p>
+      <div class="grid2">
+        <div><label class="field">Version</label><input type="number" min="0" data-bind="firmware.version" data-type="number"></div>
+        <div><label class="field">MD5</label><input data-bind="firmware.md5" placeholder="32 hex characters"></div>
+      </div>
+      <label class="field">URL</label><input data-bind="firmware.url" placeholder="https://…/firmware.bin">
+    </details>
+    <div class="row" style="margin-top:14px"><button id="signOut">Sign out</button></div>
+  </section>
+</main>
+
+<div class="savebar hidden" id="savebar">
+  <div class="row">
+    <span class="grow sub" id="saveState">All changes saved</span>
+    <button id="revert" disabled>Undo</button>
+    <button id="save" class="primary" disabled>Save</button>
+  </div>
+</div>
+
+<script type="module">
+import { decodeBundle, composite, rgb565to888 } from "./decode.js";
+
+const $ = (id) => document.getElementById(id);
+const SCREEN_NAMES = { ticker: "Stock ticker", since1968: "S&P since 1968", indices: "Index summary", message: "Messages", firm: "Firm progress" };
+let pw = localStorage.getItem("tickerPw") || "";
+let saved = null;   // last saved config
+let draft = null;   // config being edited
+let bundle = null;  // decoded preview bundle
+let current = 0;    // preview screen index
+let fetchedAt = 0;
+
+// ---------------------------------------------------------------- api
+
+async function api(path, opts = {}) {
+  const res = await fetch(path, { ...opts, headers: { Authorization: `Bearer ${pw}`, "Content-Type": "application/json", ...(opts.headers || {}) } });
+  if (res.status === 401) { showLogin("Wrong password."); throw new Error("unauthorized"); }
+  return res;
+}
+
+function showLogin(msg = "") {
+  $("app").classList.add("hidden"); $("savebar").classList.add("hidden");
+  $("login").classList.remove("hidden"); $("loginMsg").textContent = msg;
+}
+
+$("loginForm").onsubmit = async (e) => {
+  e.preventDefault();
+  pw = $("pw").value;
+  localStorage.setItem("tickerPw", pw);
+  load();
+};
+$("signOut").onclick = () => { localStorage.removeItem("tickerPw"); pw = ""; showLogin(); };
+
+async function load() {
+  if (!pw) return showLogin();
+  const res = await api("/api/config");
+  const data = await res.json();
+  if (!res.ok) { showLogin(data.error || "Server error"); return; }
+  $("login").classList.add("hidden"); $("app").classList.remove("hidden"); $("savebar").classList.remove("hidden");
+  saved = data.config; draft = structuredClone(saved);
+  renderDevice(data.device, data.sources);
+  renderAll();
+  refreshPreview();
+}
+
+// ---------------------------------------------------------------- editing
+
+function get(path) { return path.split(".").reduce((o, k) => o?.[k], draft); }
+function set(path, v) { const ks = path.split("."); const last = ks.pop(); ks.reduce((o, k) => o[k], draft)[last] = v; changed(); }
+
+function bindFields() {
+  document.querySelectorAll("[data-bind]").forEach((el) => {
+    const path = el.dataset.bind;
+    const v = get(path);
+    if (el.type === "checkbox") el.checked = !!v; else el.value = v ?? "";
+    el.oninput = () => {
+      let val = el.type === "checkbox" ? el.checked : el.value;
+      if (el.dataset.type === "number") val = Number(val);
+      set(path, val);
+      showValues();
+    };
+  });
+  showValues();
+}
+function showValues() { document.querySelectorAll("[data-show]").forEach((el) => (el.textContent = get(el.dataset.show))); }
+
+function move(list, i, d) { const j = i + d; if (j < 0 || j >= list.length) return; [list[i], list[j]] = [list[j], list[i]]; changed(); renderAll(); }
+
+function renderSymbols() {
+  const box = $("symbols"); box.innerHTML = "";
+  draft.symbols.forEach((s, i) => {
+    const row = document.createElement("div"); row.className = "row";
+    row.innerHTML = `<span class="sym"></span><input class="label-in" maxlength="8" placeholder="Label"><span class="grow"></span>
+      <button class="icon" title="Move up">↑</button><button class="icon" title="Move down">↓</button><button class="icon" title="Remove">✕</button>`;
+    row.querySelector(".sym").textContent = s.symbol;
+    const lab = row.querySelector("input"); lab.value = s.label || "";
+    lab.oninput = () => { s.label = lab.value.toUpperCase(); changed(); };
+    const [up, down, del] = row.querySelectorAll("button");
+    up.onclick = () => move(draft.symbols, i, -1); down.onclick = () => move(draft.symbols, i, 1);
+    del.onclick = () => { draft.symbols.splice(i, 1); changed(); renderAll(); };
+    box.appendChild(row);
+  });
+  if (!draft.symbols.length) box.innerHTML = `<p class="sub">No stocks yet.</p>`;
+}
+
+$("addForm").onsubmit = async (e) => {
+  e.preventDefault();
+  const sym = $("newSym").value.trim().toUpperCase();
+  const msg = $("addMsg");
+  if (!sym) return;
+  if (draft.symbols.some((s) => s.symbol === sym)) { msg.className = "msg err"; msg.textContent = `${sym} is already on the list.`; return; }
+  if (draft.symbols.length >= 25) { msg.className = "msg err"; msg.textContent = "25 stocks is the limit."; return; }
+  msg.className = "msg"; msg.textContent = `Checking ${sym}…`;
+  const res = await api(`/api/lookup?symbol=${encodeURIComponent(sym)}`);
+  const data = await res.json();
+  if (!res.ok) { msg.className = "msg err"; msg.textContent = data.error || "Lookup failed"; return; }
+  draft.symbols.push({ symbol: data.symbol, label: "" });
+  msg.className = "msg good"; msg.textContent = `Added ${data.symbol} (${data.quote.price.toFixed(2)}). Remember to save.`;
+  $("newSym").value = ""; changed(); renderAll();
+};
+
+function renderScreens() {
+  const box = $("screens"); box.innerHTML = "";
+  draft.screens.forEach((s, i) => {
+    const row = document.createElement("div"); row.className = "row";
+    row.innerHTML = `<input type="checkbox"><span class="grow"></span><button class="icon">↑</button><button class="icon">↓</button>`;
+    row.querySelector("span").textContent = SCREEN_NAMES[s.id] || s.id;
+    const cb = row.querySelector("input"); cb.checked = s.enabled;
+    cb.onchange = () => { s.enabled = cb.checked; changed(); };
+    const [up, down] = row.querySelectorAll("button");
+    up.onclick = () => move(draft.screens, i, -1); down.onclick = () => move(draft.screens, i, 1);
+    box.appendChild(row);
+  });
+}
+
+function renderMessages() {
+  const box = $("messages"); box.innerHTML = "";
+  draft.messages.forEach((m, i) => {
+    const wrap = document.createElement("div"); wrap.style.marginTop = i ? "12px" : "0";
+    wrap.innerHTML = `<textarea maxlength="200"></textarea><div class="row" style="margin-top:6px"><input type="color"><span class="grow sub">Color</span><button>Remove</button></div>`;
+    const ta = wrap.querySelector("textarea"); ta.value = m.text;
+    ta.oninput = () => { m.text = ta.value; changed(); };
+    const col = wrap.querySelector("input"); col.value = m.color;
+    col.oninput = () => { m.color = col.value; changed(); };
+    wrap.querySelector("button").onclick = () => { draft.messages.splice(i, 1); changed(); renderAll(); };
+    box.appendChild(wrap);
+  });
+}
+$("addMessage").onclick = () => { draft.messages.push({ text: "", color: "#ffc83c" }); changed(); renderAll(); };
+
+function renderAll() { renderSymbols(); renderScreens(); renderMessages(); bindFields(); }
+
+// ---------------------------------------------------------------- save
+
+let previewTimer;
+function changed() {
+  const dirty = JSON.stringify(draft) !== JSON.stringify(saved);
+  $("save").disabled = !dirty; $("revert").disabled = !dirty;
+  $("saveState").textContent = dirty ? "Unsaved changes" : "All changes saved";
+  clearTimeout(previewTimer); previewTimer = setTimeout(refreshPreview, 600);
+}
+
+$("revert").onclick = () => { draft = structuredClone(saved); renderAll(); changed(); };
+$("save").onclick = async () => {
+  $("save").disabled = true; $("saveState").textContent = "Saving…";
+  const res = await api("/api/config", { method: "PUT", body: JSON.stringify(draft) });
+  const data = await res.json();
+  if (!res.ok) { $("saveState").textContent = `Save failed: ${data.error || res.status}`; $("save").disabled = false; return; }
+  saved = data.config; draft = structuredClone(saved); renderAll(); changed();
+  $("saveState").textContent = "Saved. The ticker updates within a few minutes.";
+};
+window.addEventListener("beforeunload", (e) => { if (!$("save").disabled) e.preventDefault(); });
+
+// ---------------------------------------------------------------- preview
+
+async function refreshPreview() {
+  try {
+    const res = await api("/api/bundle", { method: "POST", body: JSON.stringify({ config: draft }) });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const prevId = bundle?.screens[current]?.id;
+    bundle = decodeBundle(new Uint8Array(await res.arrayBuffer()));
+    fetchedAt = performance.now();
+    const keep = bundle.screens.findIndex((s) => s.id === prevId);
+    current = keep >= 0 ? keep : 0;
+    renderTabs();
+  } catch (e) {
+    $("previewNote").textContent = `Preview failed: ${e.message}`;
+  }
+}
+
+function renderTabs() {
+  const box = $("screenTabs"); box.innerHTML = "";
+  bundle.screens.forEach((s, i) => {
+    const b = document.createElement("button");
+    b.textContent = s.id.replace(/^message(\d*)$/, (_, n) => `Message ${n || 1}`).replace("since1968", "Since 1968").replace(/^\w/, (c) => c.toUpperCase());
+    if (i === current) b.className = "on";
+    b.onclick = () => { current = i; renderTabs(); };
+    box.appendChild(b);
+  });
+}
+
+const ctx = $("led").getContext("2d");
+function draw() {
+  requestAnimationFrame(draw);
+  if (!bundle) return;
+  const s = bundle.screens[current];
+  const secs = (performance.now() - fetchedAt) / 1000;
+  const offset = s.speed && s.stripW > 64 ? Math.floor(secs * s.speed) % s.stripW : 0;
+  const header = { ...bundle.header, time: bundle.header.time + Math.floor(secs) };
+  const px = composite(s, header, offset);
+  const scale = 10, bright = Math.max(0.25, bundle.header.brightness / 255);
+  ctx.fillStyle = "#050505"; ctx.fillRect(0, 0, 640, 320);
+  for (let y = 0; y < 32; y++) for (let x = 0; x < 64; x++) {
+    const [r, g, b] = rgb565to888(px[y * 64 + x]);
+    ctx.fillStyle = r | g | b ? `rgb(${r * bright},${g * bright},${b * bright})` : "#141414";
+    ctx.beginPath(); ctx.arc(x * scale + 5, y * scale + 5, 3.9, 0, Math.PI * 2); ctx.fill();
+  }
+}
+draw();
+
+// ---------------------------------------------------------------- device status
+
+function ago(ms) {
+  const s = Math.round(ms / 1000);
+  if (s < 90) return `${s}s ago`; if (s < 5400) return `${Math.round(s / 60)} min ago`;
+  if (s < 172800) return `${Math.round(s / 3600)} h ago`; return `${Math.round(s / 86400)} days ago`;
+}
+
+function renderDevice(device, sources) {
+  const pill = $("devicePill"), line = $("deviceLine");
+  if (!device) { pill.className = "pill warn"; pill.textContent = "Never seen"; line.textContent = "Waiting for the first heartbeat from the device."; }
+  else {
+    const age = Date.now() - Date.parse(device.last_seen);
+    const online = age < 12 * 60 * 1000;
+    pill.className = `pill ${online ? "ok" : "bad"}`; pill.textContent = online ? "Online" : "Offline";
+    line.textContent = `Last heartbeat ${ago(age)}`;
+  }
+  const i = device?.info || {};
+  const rows = [
+    ["Firmware", i.fw ?? "—"], ["Wi-Fi signal", i.rssi ? `${i.rssi} dBm` : "—"], ["Local IP", i.ip || "—"],
+    ["Uptime", i.uptime ? ago(i.uptime * 1000).replace(" ago", "") : "—"], ["Showing", i.screen || "—"],
+    ["Last reset", i.reset || "—"], ["Last error", i.err || "none"],
+    ["Quotes", sources.quotes === "demo" ? "DEMO DATA (no API key set)" : sources.quotes],
+    ["S&P level", sources.fred ? "FRED" : "History file (set FRED_KEY)"],
+    ["Database", sources.database ? "connected" : "not configured"],
+  ];
+  const dl = $("deviceInfo"); dl.innerHTML = "";
+  for (const [k, v] of rows) { const dt = document.createElement("dt"); dt.textContent = k; const dd = document.createElement("dd"); dd.textContent = v; dl.append(dt, dd); }
+}
+
+load().catch((e) => console.error(e));
+</script>
+</body>
+</html>

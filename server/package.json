@@ -1,0 +1,10 @@
+{
+  "name": "stock-ticker-server",
+  "private": true,
+  "type": "module",
+  "engines": { "node": "22.x" },
+  "scripts": {
+    "test": "node --test",
+    "preview": "node tools/preview.js"
+  }
+}
