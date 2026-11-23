@@ -26,6 +26,10 @@ ap.add_argument("out")
 ap.add_argument("--photo-gamma", type=float, default=1.0)
 ap.add_argument("--photo-scale", type=float, default=1.0)
 ap.add_argument("--photo-min-colors", type=int, default=48)
+ap.add_argument("--photo-black", type=int, default=0,
+                help="after gamma, pixels whose brightest channel is below this become pure black")
+ap.add_argument("--photo-dark-desat", type=int, default=0,
+                help="pixels darker than this are pulled toward grey, so LED rounding can't tint them")
 args = ap.parse_args()
 src, out = args.src, args.out
 lut = [min(255, round(255 * ((v / 255) ** args.photo_gamma) * args.photo_scale)) for v in range(256)]
@@ -44,13 +48,35 @@ images = [Image.open(f"{src}/frames/{f['file']}").convert("RGB") for f in t["fra
 photo = [i for i, im in enumerate(images) if colours(im) >= args.photo_min_colors]
 photo_range = range(photo[0], photo[-1] + 1) if photo and args.photo_gamma * args.photo_scale != 1 else range(0)
 
+def clean_darks(im):
+    """At the bottom of the range an LED channel has only a few steps, so a
+    dark pixel's hue is mostly rounding error: it shows as a red or green dot.
+    Make near-blacks black, and fade the colour out of other dark pixels."""
+    if not (args.photo_black or args.photo_dark_desat):
+        return im
+    px = list(im.getdata()) if not hasattr(im, "get_flattened_data") else list(im.get_flattened_data())
+    out = []
+    for r, g, b in px:
+        m = max(r, g, b)
+        if m < args.photo_black:
+            out.append((0, 0, 0))
+            continue
+        if m < args.photo_dark_desat:
+            grey = (r + g + b) / 3
+            k = m / args.photo_dark_desat  # 0 = fully grey, 1 = original colour
+            r, g, b = (round(grey + (c - grey) * k) for c in (r, g, b))
+        out.append((r, g, b))
+    im = im.copy()
+    im.putdata(out)
+    return im
+
 body = bytearray()
 raw_total = 0
 photo_frames = 0
 for idx, (f, im) in enumerate(zip(t["frames"], images)):
     assert im.size == (64, 32), f["file"]
     if idx in photo_range:
-        im = im.point(lut * 3)
+        im = clean_darks(im.point(lut * 3))
         photo_frames += 1
     b = im.tobytes()
     px = [rgb565(b[k], b[k + 1], b[k + 2]) for k in range(0, len(b), 3)]

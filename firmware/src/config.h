@@ -15,7 +15,7 @@
 
 // Bump this for every firmware release you publish for OTA. The server's
 // /api/ping tells the device about newer versions; it only updates upward.
-#define FW_VERSION 3
+#define FW_VERSION 4
 
 // ---- Timing (rarely need changing) ---------------------------------------
 namespace cfg {
