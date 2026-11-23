@@ -15,8 +15,8 @@ export const C = {
   white: rgb(255, 255, 255),
   grey: rgb(150, 150, 150),
   dim: rgb(60, 60, 60),
-  green: rgb(0, 230, 60),
-  red: rgb(255, 40, 40),
+  green: rgb(0, 255, 0),  // pure colors stay true when the device dims them at night
+  red: rgb(255, 0, 0),
   amber: rgb(255, 170, 0),
   blue: rgb(40, 140, 255),
   cyan: rgb(0, 200, 220),

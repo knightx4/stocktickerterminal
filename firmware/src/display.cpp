@@ -13,20 +13,33 @@ Adafruit_Protomatter matrix(board::kWidth, 6, 1, board::rgbPins, 4, board::addrP
 
 // ---------------------------------------------------------------- brightness
 // Protomatter has no brightness control, so every RGB565 pixel goes through
-// these lookup tables. A non-zero channel never scales to zero, so dim
-// colors stay visible even at very low brightness.
+// these lookup tables. Channels are scaled straight down (no minimum), so a
+// colour keeps its hue when dimmed: forcing small channels up to the minimum
+// step turned red (255,40,40) pink at night. Only if the whole pixel would
+// vanish do we light its strongest channel at the lowest step.
 uint8_t lutBrightness = 255;
 uint8_t lut5[32], lut6[64];
 
 void buildLut(uint8_t brightness) {
   if (brightness == lutBrightness && lut5[31]) return;
   lutBrightness = brightness;
-  for (int i = 0; i < 32; i++) lut5[i] = i == 0 || brightness == 0 ? 0 : max(1, i * brightness / 255);
-  for (int i = 0; i < 64; i++) lut6[i] = i == 0 || brightness == 0 ? 0 : max(1, i * brightness / 255);
+  for (int i = 0; i < 32; i++) lut5[i] = i * brightness / 255;
+  for (int i = 0; i < 64; i++) lut6[i] = i * brightness / 255;
 }
 
 inline uint16_t scale(uint16_t c) {
-  return (lut5[c >> 11] << 11) | (lut6[(c >> 5) & 0x3F] << 5) | lut5[c & 0x1F];
+  if (!c || !lutBrightness) return 0;
+  uint8_t r = c >> 11, g = (c >> 5) & 0x3F, b = c & 0x1F;
+  uint8_t sr = lut5[r], sg = lut6[g], sb = lut5[b];
+  if (!(sr | sg | sb)) {
+    // Too dim to show at all: keep the dominant channel at its lowest step.
+    // Green has 6 bits, so compare it at 5-bit scale.
+    uint8_t g5 = g >> 1;
+    if (r >= g5 && r >= b) sr = 1;
+    else if (g5 >= b) sg = 1;
+    else sb = 1;
+  }
+  return (sr << 11) | (sg << 5) | sb;
 }
 
 // ---------------------------------------------------------------- clock font
