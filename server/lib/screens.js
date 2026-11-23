@@ -96,8 +96,6 @@ export function tickerScreen(ctx) {
     // line 2: price (colored by the day's move), then the arrow
     const priceW = strip.text(x, 13, b.price, color);
     if (Math.abs(b.q.pct) > 0.005) strip.arrow(x + priceW + 3, 15, b.q.pct > 0, color);
-    // small dot separator in the gap
-    strip.set(x + b.width + gap / 2, 9, C.dim);
     x += b.width + gap;
   }
 
