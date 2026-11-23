@@ -4,6 +4,7 @@
 #pragma once
 #include <Arduino.h>
 
+#include "anim.h"
 #include "bundle.h"
 
 // Read-mostly status shared with the display loop.
@@ -16,13 +17,20 @@ struct NetStatus {
 };
 extern NetStatus netStatus;
 
-// Loads the cached bundle from flash (if any) and starts the network task.
-// forcePortal: open the Wi-Fi setup portal right away (UP held at boot).
+// Loads the cached bundle from flash (if any). Call before the display starts:
+// reading flash while the panel is refreshing garbles it for a moment.
+void netInit();
+
+// Starts the network task. forcePortal: open the Wi-Fi setup portal right away
+// (UP held at boot).
 void netBegin(bool forcePortal);
 
 // The current bundle, or nullptr. Hold the lock while using it.
 Bundle* lockBundle();
 void unlockBundle();
+
+// The downloaded animation, or nullptr. Only valid while the bundle lock is held.
+const Animation* lockedAnimation();
 
 // Last error text, for the heartbeat.
 String netLastError();

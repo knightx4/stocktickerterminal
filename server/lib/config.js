@@ -1,7 +1,7 @@
 // Settings: defaults, validation, and load/save in Supabase (ticker.config).
 import { dbGet, dbPut } from "./db.js";
 
-export const SCREEN_IDS = ["ticker", "since1968", "indices", "message", "firm"];
+export const SCREEN_IDS = ["ticker", "since1968", "indices", "birthday", "message", "firm"];
 
 export const DEFAULT_CONFIG = {
   symbols: [
@@ -12,6 +12,7 @@ export const DEFAULT_CONFIG = {
     { id: "ticker", enabled: true },
     { id: "since1968", enabled: true },
     { id: "indices", enabled: true },
+    { id: "birthday", enabled: true },
     { id: "message", enabled: false },
     { id: "firm", enabled: false },
   ],

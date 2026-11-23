@@ -24,7 +24,8 @@ its clock from `server_time`.
 | 10 | u16 | dwell_seconds: auto-advance to the next screen after this long, 0 = off |
 | 12 | u32 | server_time, Unix seconds (UTC) |
 | 16 | i16 | utc_offset_min for the clock (for example, -360 = CST, -300 = CDT) |
-| 18 | u8[6] | reserved, 0 |
+| 18 | u8 | autoplay_minutes: if > 0, play the animation screen on its own this often (firmware 3+; the server sets it on his birthday, daytime only) |
+| 19 | u8[5] | reserved, 0 |
 
 The flags byte:
 - bit0: stale. The server couldn't refresh market data, so this frame shows
@@ -48,9 +49,15 @@ The flags byte:
 | u8 | strip_h: height in rows; 0 = no strip |
 | u16 | strip_w: width in pixels |
 | u8 | scroll_speed in pixels per second; 0 = static |
-| u8 | reserved, 0 |
-| u16[64*32] | bg: the static layer, row-major |
+| u8 | kind: 0 = still/scroll screen, 1 = animation |
+| u16[64*32] | bg: the static layer, row-major (for an animation: a still "poster" frame) |
 | u16[strip_w*strip_h] | strip, row-major |
+| *kind 1 only:* u32 | asset_crc: standard CRC-32 (zlib) of the animation file |
+| *kind 1 only:* u32 | asset_size in bytes (at most 1.5 MB) |
+| *kind 1 only:* u8 + char[n] | asset_id, e.g. `birthday` (at most 16 characters) |
+
+The server sends kind 1 only to firmware that reports `&fw=3` or higher in the
+bundle URL. Older firmware gets the poster as a kind 0 screen.
 
 ### Drawing rules (device)
 
@@ -104,3 +111,27 @@ next reset.
 
 `t` must match the server's `DEVICE_TOKEN` env var; otherwise the response is
 `401`. The admin page uses the separate `ADMIN_PASSWORD` instead.
+
+## `GET /api/asset?id=<asset_id>&t=<DEVICE_TOKEN>`
+
+This returns an animation in TKA1 format. The device downloads it once, when
+an animation screen names a CRC it doesn't already have, and keeps it in PSRAM.
+It is not saved to flash. It is never cached by the CDN, because it can
+contain private photos; for the same reason it is stored in Supabase
+(`ticker.asset`), not in git.
+
+TKA1, little-endian:
+
+| Type | Field |
+|---|---|
+| char[4] | magic `"TKA1"` |
+| u16, u16 | width = 64, height = 32 |
+| u16 | frame_count |
+| u32 | total_ms (one loop) |
+| repeated: u16 | frame duration in ms |
+| u8 | encoding: 0 = raw (2048 × u16 RGB565), 1 = RLE |
+| u16 | byte length of the frame data |
+| bytes | raw pixels, or RLE runs of (u8 count 1–255, u16 RGB565) covering 2048 pixels |
+
+`server/tools/build-animation.py` builds a TKA1 file from PNG frames plus
+`timeline.json`.

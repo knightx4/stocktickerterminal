@@ -4,6 +4,7 @@
 // only says where. See docs/protocol.md.
 import { Canvas, C, rgb, hexToRgb565, textWidth, W, H } from "./canvas.js";
 import { INDEX_ETFS } from "./market.js";
+import { decodeFrame } from "./animation.js";
 
 // ---------------------------------------------------------------- formatting
 
@@ -228,6 +229,29 @@ export function firmScreen(ctx) {
   return { id: "firm", bg };
 }
 
+// ---------------------------------------------------------------- birthday
+
+// Frame shown as the still "poster" (the cake scene) by firmware that can't
+// play animations, and while the device is still downloading the animation.
+export const BIRTHDAY_POSTER_FRAME = 130;
+
+// The birthday animation, played by the device itself (firmware 3+). Older
+// firmware gets the poster frame as an ordinary still screen.
+export function birthdayScreen(ctx) {
+  const anim = ctx.animations?.birthday;
+  const bg = new Canvas();
+  if (!anim) {
+    bg.text(4, 4, "HAPPY", C.amber);
+    bg.text(4, 13, "BIRTHDAY", C.amber);
+    bg.text(4, 22, "DAD!", C.amber);
+    return { id: "birthday", bg };
+  }
+  const frames = anim.index.frames;
+  bg.px.set(decodeFrame(anim.buf, frames[Math.min(BIRTHDAY_POSTER_FRAME, frames.length - 1)]));
+  const playable = (ctx.fw ?? 0) >= 3;
+  return { id: "birthday", bg, asset: playable ? { id: anim.id, crc: anim.crc, size: anim.size } : null };
+}
+
 // ---------------------------------------------------------------- all
 
 export function renderScreens(ctx) {
@@ -238,6 +262,7 @@ export function renderScreens(ctx) {
       if (s.id === "ticker") out.push(tickerScreen(ctx));
       if (s.id === "indices") out.push(indicesScreen(ctx));
       if (s.id === "since1968") out.push(since1968Screen(ctx));
+      if (s.id === "birthday") out.push(birthdayScreen(ctx));
       if (s.id === "message") out.push(...messageScreens(ctx));
       if (s.id === "firm") out.push(firmScreen(ctx));
     } catch (e) {

@@ -125,6 +125,12 @@ void displayScreen(const Bundle& b, int index, uint32_t scrollMs, int32_t localT
   matrix.show();
 }
 
+void displayAnimation(const Animation& a, uint32_t ms, uint8_t brightness) {
+  buildLut(brightness);
+  animationFrame(a, ms, matrix.getBuffer(), scale);
+  matrix.show();
+}
+
 void displayText(const char* l1, const char* l2, const char* l3, const char* l4,
                  uint8_t brightness) {
   buildLut(brightness);

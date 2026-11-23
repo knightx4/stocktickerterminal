@@ -22,9 +22,17 @@ struct Screen {
   uint8_t stripY, stripH;  // stripH == 0 -> no strip
   uint16_t stripW;
   uint8_t scrollSpeed;     // px per second
-  const uint8_t* bg;       // 64*32 RGB565 LE
+  uint8_t kind;            // kScreenStill or kScreenAnimation
+  const uint8_t* bg;       // 64*32 RGB565 LE (for an animation: the still "poster")
   const uint8_t* strip;    // stripW*stripH RGB565 LE (nullptr if none)
+  // Animation screens only: the asset to download from /api/asset?id=...
+  uint32_t assetCrc, assetSize;
+  char assetId[17];
 };
+
+constexpr uint8_t kScreenStill = 0;
+constexpr uint8_t kScreenAnimation = 1;
+constexpr uint32_t kMaxAssetBytes = 1536 * 1024;  // fits comfortably in the 2 MB PSRAM
 
 struct Bundle {
   uint8_t* data = nullptr;  // owned raw bytes (free with freeBundle)
@@ -39,6 +47,7 @@ struct Bundle {
   uint16_t dwellSeconds = 0;
   uint32_t serverTime = 0;
   int16_t utcOffsetMin = 0;
+  uint8_t autoplayMinutes = 0;  // >0: play the animation screen on its own this often
   Screen screens[kMaxScreens];
 
   uint32_t fetchedAtMs = 0; // millis() when received

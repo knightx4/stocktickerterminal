@@ -38,7 +38,7 @@ test("config sanitizing rejects junk and fills defaults", () => {
   assert.equal(c.symbols[0].symbol, "AAPLSCRIPT");
   assert.ok(c.symbols.length <= 25);
   assert.equal(c.screens[0].id, "firm");
-  assert.equal(c.screens.length, 5);
+  assert.equal(c.screens.length, 6);
   assert.equal(c.display.dayBrightness, 100);
   assert.equal(c.display.timezone, "America/Chicago");
   assert.equal(c.display.nightStart, "22:00");
@@ -66,7 +66,7 @@ test("bundle encodes, decodes and obeys device limits", async () => {
   assert.ok(buf.length < 512 * 1024);
   assert.equal(header.utcOffset, -360);
   assert.equal(clockText(header.time, header.utcOffset, false), "10:42");
-  assert.deepEqual(screens.map((s) => s.id), ["ticker", "since1968", "indices", "message", "message2", "firm"]);
+  assert.deepEqual(screens.map((s) => s.id), ["ticker", "since1968", "indices", "birthday", "message", "message2", "firm"]);
   for (const s of screens) {
     if (s.clockX !== 255) assert.ok(s.clockX <= 63 && s.clockY <= 27, s.id);
     assert.ok(s.stripY + s.stripH <= 32, s.id);
@@ -74,7 +74,7 @@ test("bundle encodes, decodes and obeys device limits", async () => {
     composite(s, header, 1000); // must not throw
   }
   assert.ok(screens[0].stripW > 64 && screens[0].speed > 0, "ticker scrolls");
-  assert.ok(screens[4].stripW > 64, "long message scrolls");
+  assert.ok(screens[5].stripW > 64, "long message scrolls");
 });
 
 test("number formatting", () => {

@@ -52,7 +52,8 @@ bool parseBundle(uint8_t* data, size_t size, Bundle& out, String& error) {
   b.dwellSeconds = r.u16();
   b.serverTime = r.u32();
   b.utcOffsetMin = (int16_t)r.u16();
-  r.bytes(6);  // reserved
+  b.autoplayMinutes = r.u8();
+  r.bytes(5);  // reserved
   if (!r.ok) { error = "short header"; return false; }
   if (b.screenCount == 0 || b.screenCount > kMaxScreens) {
     error = "bad screen count " + String(b.screenCount);
@@ -75,7 +76,11 @@ bool parseBundle(uint8_t* data, size_t size, Bundle& out, String& error) {
     s.stripH = r.u8();
     s.stripW = r.u16();
     s.scrollSpeed = r.u8();
-    r.u8();  // reserved
+    s.kind = r.u8();
+    if (s.kind != kScreenStill && s.kind != kScreenAnimation) {
+      error = "unknown screen kind " + String(s.kind);
+      return false;
+    }
     s.bg = r.bytes(64 * 32 * 2);
     s.strip = nullptr;
     if (s.stripH > 0) {
@@ -84,6 +89,21 @@ bool parseBundle(uint8_t* data, size_t size, Bundle& out, String& error) {
         return false;
       }
       s.strip = r.bytes((size_t)s.stripW * s.stripH * 2);
+    }
+    s.assetCrc = s.assetSize = 0;
+    s.assetId[0] = 0;
+    if (s.kind == kScreenAnimation) {
+      s.assetCrc = r.u32();
+      s.assetSize = r.u32();
+      uint8_t n = r.u8();
+      const uint8_t* aid = r.bytes(n);
+      if (!r.ok) break;
+      if (n == 0 || n >= sizeof(s.assetId) || s.assetSize == 0 || s.assetSize > kMaxAssetBytes) {
+        error = "bad animation on screen " + String(i);
+        return false;
+      }
+      memcpy(s.assetId, aid, n);
+      s.assetId[n] = 0;
     }
     if (s.clockX != 255 && (s.clockX > 63 || s.clockY > 27)) s.clockX = 255;  // ignore off-screen clock
   }

@@ -17,6 +17,8 @@ namespace {
 
 SemaphoreHandle_t bundleMutex;
 Bundle* current = nullptr;   // owned by the net task; display reads it under the mutex
+Animation* currentAnim = nullptr;  // same rules as `current`
+uint32_t nextAnimTryMs = 0;        // back-off after a failed animation download
 String lastError;
 WiFiManager wm;
 
@@ -31,6 +33,7 @@ class BufferStream : public Stream {
  public:
   uint8_t* buf = nullptr;
   size_t len = 0, cap = 0;
+  size_t limit = cfg::kMaxBundleBytes;
   bool overflow = false;
 
   ~BufferStream() { free(buf); }
@@ -39,10 +42,10 @@ class BufferStream : public Stream {
   size_t write(uint8_t c) override { return write(&c, 1); }
   size_t write(const uint8_t* data, size_t n) override {
     esp_task_wdt_reset();
-    if (len + n > cfg::kMaxBundleBytes) { overflow = true; return 0; }
+    if (len + n > limit) { overflow = true; return 0; }
     if (len + n > cap) {
       size_t newCap = max(cap * 2, len + n + 16 * 1024);
-      newCap = min(newCap, cfg::kMaxBundleBytes);
+      newCap = min(newCap, limit);
       uint8_t* nb = (uint8_t*)ps_realloc(buf, newCap);
       if (!nb) { overflow = true; return 0; }
       buf = nb;
@@ -136,7 +139,8 @@ bool fetchBundle() {
   http.setConnectTimeout(cfg::kHttpTimeoutMs);
   http.setTimeout(cfg::kHttpTimeoutMs);
   http.setFollowRedirects(HTTPC_STRICT_FOLLOW_REDIRECTS);
-  String url = String(SERVER_URL) + "/api/bundle?t=" + DEVICE_TOKEN;
+  // fw tells the server we can play animations (firmware 3+).
+  String url = String(SERVER_URL) + "/api/bundle?t=" + DEVICE_TOKEN + "&fw=" + String(FW_VERSION);
   if (!http.begin(client, url)) { setError("bundle: bad URL"); return false; }
   int code = http.GET();
   if (code != 200) {
@@ -175,6 +179,68 @@ bool fetchBundle() {
     markedValid = true;
   }
   return true;
+}
+
+// ---------------------------------------------------------------- animations
+
+// Downloads the animation an animation screen refers to, if we don't already
+// have that exact one (matched by CRC). Kept in PSRAM only.
+void ensureAnimation() {
+  Bundle* b = current;  // only this task replaces bundles
+  if (!b) return;
+  const Screen* s = nullptr;
+  for (int i = 0; i < b->screenCount; i++)
+    if (b->screens[i].kind == kScreenAnimation) { s = &b->screens[i]; break; }
+  if (!s) return;
+  if (currentAnim && currentAnim->crc == s->assetCrc) return;
+  if (nextAnimTryMs && (int32_t)(millis() - nextAnimTryMs) < 0) return;
+  nextAnimTryMs = millis() + 5UL * 60 * 1000;  // retry in 5 min if this fails
+
+  WiFiClientSecure client;
+  client.setInsecure();  // TODO: pin a root CA (same as fetchBundle)
+  HTTPClient http;
+  http.setConnectTimeout(cfg::kHttpTimeoutMs);
+  http.setTimeout(cfg::kHttpTimeoutMs);
+  String url = String(SERVER_URL) + "/api/asset?id=" + s->assetId + "&t=" + DEVICE_TOKEN;
+  if (!http.begin(client, url)) { setError("asset: bad URL"); return; }
+  int code = http.GET();
+  if (code != 200) {
+    setError("asset: HTTP " + String(code));
+    http.end();
+    return;
+  }
+  BufferStream body;
+  body.limit = kMaxAssetBytes;
+  int written = http.writeToStream(&body);
+  http.end();
+  if (written < 0 || body.overflow || body.len != s->assetSize) {
+    setError("asset: read " + String(body.len) + " of " + String(s->assetSize));
+    return;
+  }
+  uint32_t crc = crc32Of(body.buf, body.len);
+  if (crc != s->assetCrc) { setError("asset: checksum mismatch"); return; }
+
+  size_t len = body.len;
+  uint8_t* data = body.release();
+  Animation* a = new Animation();
+  String err;
+  if (!parseAnimation(data, len, *a, err)) {
+    free(data);
+    delete a;
+    setError("asset: " + err);
+    return;
+  }
+  a->crc = crc;
+  strlcpy(a->id, s->assetId, sizeof a->id);
+
+  xSemaphoreTake(bundleMutex, portMAX_DELAY);
+  Animation* old = currentAnim;
+  currentAnim = a;
+  xSemaphoreGive(bundleMutex);
+  if (old) { freeAnimation(old); delete old; }
+  nextAnimTryMs = 0;
+  Serial.printf("[net] Animation '%s' ready: %u frames, %u ms, %u bytes\n", a->id, a->count,
+                (unsigned)a->totalMs, (unsigned)len);
 }
 
 // ---------------------------------------------------------------- Wi-Fi
@@ -225,6 +291,7 @@ void netTask(void*) {
     if (connected) {
       if ((int32_t)(now - nextFetchMs) >= 0) {
         if (fetchBundle()) {
+          ensureAnimation();
           Bundle* b = current;
           nextFetchMs = millis() + (b ? b->pollSeconds * 1000UL : cfg::kDefaultPollMs);
           retryDelayMs = cfg::kRetryMinMs;
@@ -274,13 +341,18 @@ void netTaskEntry(void* arg) {
 
 }  // namespace
 
-void netBegin(bool forcePortal) {
+void netInit() {
   bundleMutex = xSemaphoreCreateMutex();
   netStatus.bootMs = millis();
   loadCache();
+}
+
+void netBegin(bool forcePortal) {
   // Core 0 alongside the Wi-Fi stack; the display loop stays on core 1.
   xTaskCreatePinnedToCore(netTaskEntry, "net", 16384, (void*)forcePortal, 1, nullptr, 0);
 }
+
+const Animation* lockedAnimation() { return currentAnim; }
 
 Bundle* lockBundle() {
   xSemaphoreTake(bundleMutex, portMAX_DELAY);

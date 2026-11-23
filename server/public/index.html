@@ -192,16 +192,31 @@
 </div>
 
 <script type="module">
-import { decodeBundle, composite, rgb565to888 } from "./decode.js";
+import { decodeBundle, composite, rgb565to888, parseAnimation, animationFrameAt } from "./decode.js";
 
 const $ = (id) => document.getElementById(id);
-const SCREEN_NAMES = { ticker: "Stock ticker", since1968: "S&P since 1968", indices: "Index summary", message: "Messages", firm: "Firm progress" };
+const SCREEN_NAMES = { ticker: "Stock ticker", since1968: "S&P since 1968", indices: "Index summary", birthday: "Birthday sequence (auto-plays on Nov 27)", message: "Messages", firm: "Firm progress" };
 let pw = localStorage.getItem("tickerPw") || "";
 let saved = null;   // last saved config
 let draft = null;   // config being edited
 let bundle = null;  // decoded preview bundle
 let current = 0;    // preview screen index
 let fetchedAt = 0;
+let shownAt = 0;         // when the current preview screen was selected
+const animations = {};   // asset id -> parsed animation (or "loading")
+
+async function ensureAnimation(id) {
+  if (animations[id]) return;
+  animations[id] = "loading";
+  try {
+    const res = await api(`/api/asset?id=${encodeURIComponent(id)}`);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    animations[id] = parseAnimation(new Uint8Array(await res.arrayBuffer()));
+  } catch (e) {
+    delete animations[id];
+    console.error("animation", e);
+  }
+}
 
 // ---------------------------------------------------------------- api
 
@@ -367,8 +382,9 @@ function renderTabs() {
   bundle.screens.forEach((s, i) => {
     const b = document.createElement("button");
     b.textContent = s.id.replace(/^message(\d*)$/, (_, n) => `Message ${n || 1}`).replace("since1968", "Since 1968").replace(/^\w/, (c) => c.toUpperCase());
+    if (s.kind === 1) ensureAnimation(s.assetId);
     if (i === current) b.className = "on";
-    b.onclick = () => { current = i; renderTabs(); };
+    b.onclick = () => { current = i; shownAt = performance.now(); renderTabs(); };
     box.appendChild(b);
   });
 }
@@ -381,7 +397,8 @@ function draw() {
   const secs = (performance.now() - fetchedAt) / 1000;
   const offset = s.speed && s.stripW > 64 ? Math.floor(secs * s.speed) % s.stripW : 0;
   const header = { ...bundle.header, time: bundle.header.time + Math.floor(secs) };
-  const px = composite(s, header, offset);
+  const anim = s.kind === 1 ? animations[s.assetId] : null;
+  const px = anim && anim !== "loading" ? animationFrameAt(anim, performance.now() - shownAt) : composite(s, header, offset);
   const scale = 10, bright = Math.max(0.25, bundle.header.brightness / 255);
   ctx.fillStyle = "#050505"; ctx.fillRect(0, 0, 640, 320);
   for (let y = 0; y < 32; y++) for (let x = 0; x < 64; x++) {

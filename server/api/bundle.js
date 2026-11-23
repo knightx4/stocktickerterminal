@@ -1,6 +1,7 @@
 // GET  /api/bundle?t=DEVICE_TOKEN    -> the binary screen bundle for the device (CDN-cached)
 // GET  /api/bundle  (admin auth)     -> same, uncached, for the settings page preview
 // POST /api/bundle  (admin auth)     -> render a draft config {config} without saving it
+// Optional &fw=N: firmware version; 3+ receives animation screens (protocol kind 1).
 import { isDevice, isAdmin, deny, readJson } from "../lib/auth.js";
 import { buildScreens, encodeBundle } from "../lib/bundle.js";
 import { sanitizeConfig } from "../lib/config.js";
@@ -16,8 +17,11 @@ export default async function handler(req, res) {
       if (!admin) return deny(res);
       config = sanitizeConfig((await readJson(req)).config);
     }
+    // Firmware 3+ sends its version and can play animations itself. The
+    // settings page preview (admin) can too.
+    const fw = admin ? 999 : Number(new URL(req.url, "http://x").searchParams.get("fw")) || 0;
     const now = new Date();
-    const built = await buildScreens({ now, config });
+    const built = await buildScreens({ now, config, fw });
     const body = encodeBundle(built, now);
 
     res.statusCode = 200;

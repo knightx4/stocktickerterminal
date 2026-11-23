@@ -28,6 +28,28 @@ uint32_t lastButtonMs = 0;
 const Bundle* lastBundle = nullptr;  // to notice when a new bundle arrives
 uint32_t lastBundleCrc = 0;
 
+// Birthday autoplay: on the day, jump to the animation screen every few
+// minutes, play it once, then go back to where we were.
+uint32_t lastAutoplayMs = 0;
+char returnId[33] = "";  // screen to return to after an autoplay ("" = none)
+
+int findScreen(const Bundle& b, const char* id) {
+  for (int i = 0; i < b.screenCount; i++)
+    if (strcmp(b.screens[i].id, id) == 0) return i;
+  return -1;
+}
+
+int findAnimationScreen(const Bundle& b) {
+  for (int i = 0; i < b.screenCount; i++)
+    if (b.screens[i].kind == kScreenAnimation) return i;
+  return -1;
+}
+
+// The animation for screen s, if it's downloaded and matches.
+const Animation* animationFor(const Screen& s, const Animation* a) {
+  return s.kind == kScreenAnimation && a && a->crc == s.assetCrc ? a : nullptr;
+}
+
 void startWatchdog() {
   esp_task_wdt_config_t wdt = {
       .timeout_ms = cfg::kWatchdogMs, .idle_core_mask = 0, .trigger_panic = true};
@@ -66,15 +88,36 @@ void followScreen(const Bundle& b) {
   showScreen(min(screenIndex, b.screenCount - 1), b);
 }
 
-void handleInput(InputEvent ev, const Bundle& b) {
+void handleInput(InputEvent ev, const Bundle& b, const Animation* anim) {
   uint32_t now = millis();
   bool tap = ev == InputEvent::Tap && (b.flags & kFlagDoubleTap);
   if (ev == InputEvent::Next || ev == InputEvent::Previous || tap) {
     lastButtonMs = now;
+    returnId[0] = 0;  // he took control; don't jump back after an autoplay
     showScreen(screenIndex + (ev == InputEvent::Previous ? -1 : 1), b);
     return;
   }
   bool paused = lastButtonMs && now - lastButtonMs < cfg::kButtonPauseMs;
+
+  // Autoplay finished: return to the screen we were on.
+  const Animation* playing = animationFor(b.screens[screenIndex], anim);
+  if (returnId[0] && playing && now - screenShownMs >= playing->totalMs) {
+    int back = findScreen(b, returnId);
+    returnId[0] = 0;
+    showScreen(back >= 0 ? back : 0, b);
+    return;
+  }
+  // Time for an autoplay (only while the server says it's the day).
+  int animIdx = findAnimationScreen(b);
+  if (b.autoplayMinutes && animIdx >= 0 && animIdx != screenIndex && !paused && !returnId[0] &&
+      animationFor(b.screens[animIdx], anim) &&
+      (!lastAutoplayMs || now - lastAutoplayMs >= b.autoplayMinutes * 60000UL)) {
+    lastAutoplayMs = now;
+    strlcpy(returnId, b.screens[screenIndex].id, sizeof returnId);
+    showScreen(animIdx, b);
+    return;
+  }
+  if (returnId[0]) return;  // don't auto-advance away from an autoplay
   if (b.dwellSeconds && b.screenCount > 1 && !paused &&
       now - screenShownMs >= b.dwellSeconds * 1000UL) {
     showScreen(screenIndex + 1, b);
@@ -116,6 +159,7 @@ void setup() {
   inputBegin();
   bool fm6126a = readFm6126aSetting();
   bool forcePortal = upHeld();
+  netInit();  // reads the flash cache: do it before the panel starts refreshing
   if (!displayBegin(fm6126a)) {
     Serial.println("Display failed to start; rebooting in 10 s");
     delay(10000);
@@ -140,11 +184,17 @@ void loop() {
       lastBundle = b;
       lastBundleCrc = b->crc;
     }
-    handleInput(ev, *b);
+    const Animation* anim = lockedAnimation();
+    handleInput(ev, *b, anim);
+    const Animation* playing = animationFor(b->screens[screenIndex], anim);
     if (netStatus.updating) {
       displayText("UPDATING", "firmware", "please", "wait", b->brightness);
     } else if (netStatus.portalActive && now % 15000 < 5000) {
       showSetupHelp();  // alternate with the data so it's never hidden
+    } else if (playing) {
+      displayAnimation(*playing, now - screenShownMs, b->brightness);
+    } else if (b->screens[screenIndex].kind == kScreenAnimation) {
+      displayScreen(*b, screenIndex, 0, -1, StatusLight::None);  // poster while it downloads
     } else {
       displayScreen(*b, screenIndex, now - screenShownMs, localSeconds(*b), statusFor(*b));
     }

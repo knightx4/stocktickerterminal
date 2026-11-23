@@ -83,3 +83,14 @@ export async function cacheGet(key) {
 export async function cacheSet(key, data) {
   await dbPut("cache", key, data);
 }
+
+// A binary asset from ticker.asset (e.g. the birthday animation), or null.
+// LOCAL_ASSETS=<dir> reads <dir>/<id>.tka instead (local dev and tests).
+export async function dbGetAsset(id) {
+  if (process.env.LOCAL_ASSETS) {
+    const { readFile } = await import("node:fs/promises");
+    return readFile(`${process.env.LOCAL_ASSETS}/${id}.tka`).catch(() => null);
+  }
+  const row = await rpc("get_asset", { p_id: String(id) });
+  return row ? Buffer.from(row.data_b64, "base64") : null;
+}
