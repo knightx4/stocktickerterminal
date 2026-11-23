@@ -15,7 +15,7 @@ export const DEFAULT_CONFIG = {
     { id: "message", enabled: false },
     { id: "firm", enabled: false },
   ],
-  messages: [{ text: "HAPPY\nBIRTHDAY\nDAD!", color: "#ffc83c" }],
+  messages: [{ text: "HAPPY\nBIRTHDAY\nDAD!", color: "#ffb000" }],
   firm: { title: "FIRM AUM", value: "$0M", goal: "$100M", percent: 0, color: "#3c8cff" },
   since1968: { baseDate: "1968-11-27", baseValue: 107.76, scale: "linear" },
   display: {
@@ -58,7 +58,7 @@ export function sanitizeConfig(input) {
   for (const s of D.screens) if (!seen.has(s.id)) screens.push({ ...s });
 
   const messages = (Array.isArray(c.messages) ? c.messages : D.messages)
-    .map((m) => ({ text: str(m?.text, 200), color: color(m?.color, "#ffc83c") }))
+    .map((m) => ({ text: str(m?.text, 200), color: color(m?.color, "#ffb000") }))
     .filter((m) => m.text.trim())
     .slice(0, 10);
 

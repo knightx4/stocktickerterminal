@@ -320,7 +320,7 @@ function renderMessages() {
     box.appendChild(wrap);
   });
 }
-$("addMessage").onclick = () => { draft.messages.push({ text: "", color: "#ffc83c" }); changed(); renderAll(); };
+$("addMessage").onclick = () => { draft.messages.push({ text: "", color: "#ffb000" }); changed(); renderAll(); };
 
 function renderAll() { renderSymbols(); renderScreens(); renderMessages(); bindFields(); }
 
