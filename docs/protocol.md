@@ -8,7 +8,8 @@ Colors are **RGB565**.
 
 Returns `application/octet-stream`: every enabled screen in one response, so
 button presses switch screens instantly and an outage still leaves every screen
-with its last data. It is CDN-cached (`s-maxage` = the poll interval).
+with its last data. It is never cached (`no-store`), because the device sets
+its clock from `server_time`.
 
 ### Header (24 bytes)
 

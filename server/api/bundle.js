@@ -23,12 +23,10 @@ export default async function handler(req, res) {
     res.statusCode = 200;
     res.setHeader("Content-Type", "application/octet-stream");
     res.setHeader("Content-Length", body.length);
-    res.setHeader(
-      "Cache-Control",
-      device
-        ? `public, max-age=0, s-maxage=${Math.min(built.poll, 60) - 5}, stale-while-revalidate=600`
-        : "no-store"
-    );
+    // Never cache: the header carries the server time the device's clock is
+    // set from, so a cached copy makes the clock run behind by its age. Market
+    // data has its own cache (lib/market.js), so this doesn't add API calls.
+    res.setHeader("Cache-Control", "no-store");
     res.end(body);
   } catch (e) {
     console.error("bundle failed", e);

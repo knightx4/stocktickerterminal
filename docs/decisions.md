@@ -46,9 +46,11 @@ FRED close, marked as such, so he never sees an incorrect index level.
 ## 3. Hosting: Vercel serverless functions with CDN caching
 
 - `GET /api/frame?screen=ticker&t=<device token>` returns a ready-to-draw frame.
-- Responses send `Cache-Control: s-maxage=60, stale-while-revalidate=600`.
-  Vercel's CDN then answers most requests, the function runs at most about
-  once a minute per screen, and the device never calls a market API directly.
+- Bundles are sent `Cache-Control: no-store`. Revised 2026-11-23: CDN caching
+  (`s-maxage` + `stale-while-revalidate`) made the device clock run behind by
+  the cached copy's age, since the clock is set from the bundle's server time.
+  Market data is cached server-side instead (memory + `ticker.cache`), so the
+  device never causes extra market API calls.
 - If an upstream API fails, the function serves the last good data (from the
   CDN or a small Vercel Blob / Edge Config cache) and marks it stale.
 - API keys live only in Vercel environment variables.
