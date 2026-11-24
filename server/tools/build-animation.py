@@ -25,6 +25,9 @@ ap.add_argument("src")
 ap.add_argument("out")
 ap.add_argument("--photo-gamma", type=float, default=1.0)
 ap.add_argument("--photo-scale", type=float, default=1.0)
+ap.add_argument("--photo-gamma-mode", choices=["channel", "luma"], default="channel",
+                help="channel: per-channel gamma (boosts saturation); luma: darken by "
+                     "brightness only, keeping each pixel's colour mix")
 ap.add_argument("--photo-min-colors", type=int, default=48)
 ap.add_argument("--photo-black", type=int, default=0,
                 help="after gamma, pixels whose brightest channel is below this become pure black")
@@ -47,6 +50,24 @@ def colours(im):
 images = [Image.open(f"{src}/frames/{f['file']}").convert("RGB") for f in t["frames"]]
 photo = [i for i, im in enumerate(images) if colours(im) >= args.photo_min_colors]
 photo_range = range(photo[0], photo[-1] + 1) if photo and args.photo_gamma * args.photo_scale != 1 else range(0)
+
+def apply_gamma(im):
+    if args.photo_gamma_mode == "channel":
+        return im.point(lut * 3)
+    # luma: scale r, g, b together by how much the gamma darkens the pixel's
+    # brightness, so hue and saturation stay as designed.
+    out = []
+    for r, g, b in list(im.get_flattened_data()) if hasattr(im, "get_flattened_data") else list(im.getdata()):
+        y = 0.299 * r + 0.587 * g + 0.114 * b
+        if y <= 0:
+            out.append((0, 0, 0))
+            continue
+        k = min(1.0, 255 * (y / 255) ** args.photo_gamma * args.photo_scale / y)
+        out.append((round(r * k), round(g * k), round(b * k)))
+    im = im.copy()
+    im.putdata(out)
+    return im
+
 
 def clean_darks(im):
     """At the bottom of the range an LED channel has only a few steps, so a
@@ -76,7 +97,7 @@ photo_frames = 0
 for idx, (f, im) in enumerate(zip(t["frames"], images)):
     assert im.size == (64, 32), f["file"]
     if idx in photo_range:
-        im = clean_darks(im.point(lut * 3))
+        im = clean_darks(apply_gamma(im))
         photo_frames += 1
     b = im.tobytes()
     px = [rgb565(b[k], b[k + 1], b[k + 2]) for k in range(0, len(b), 3)]
