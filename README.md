@@ -91,7 +91,7 @@ frames are kept out of git. They live in Supabase (`ticker.asset`, id
 page. To rebuild it from the handoff folder (`timeline.json` plus `frames/`):
 
 ```bash
-cd server && python3 tools/build-animation.py <handoff-dir> birthday.tka --photo-gamma 1.8 --photo-scale 0.8 --photo-gamma-mode luma --photo-black 24 --photo-dark-desat 72
+cd server && python3 tools/build-animation.py <handoff-dir> birthday.tka --photo-gamma 1.8 --photo-scale 0.8 --photo-gamma-mode luma --photo-black 16 --photo-dark-desat 56
 ```
 
 These are the current settings (2026-11-24). They darken the photo montage
@@ -100,8 +100,9 @@ for the LEDs: brightness-only gamma, so colours don't get exaggerated, plus
 `ticker.put_asset(TICKER_DB_SECRET, 'birthday', <base64>)` database function.
 The server picks it up within 10 minutes and the device within 2 more.
 
-On firmware 4 or later, `--photo-black 16 --photo-dark-desat 56` keeps more
-shadow detail, with no stray-colour specks.
+These settings assume firmware 4 or later. Firmware 3 lights near-black
+pixels as stray red/green specks, so it needs a deeper cut:
+`--photo-black 24 --photo-dark-desat 72`.
 
 ## Milestone 1: panel test
 
