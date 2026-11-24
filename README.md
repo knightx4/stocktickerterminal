@@ -83,6 +83,26 @@ The bundle parser has a desktop test: `firmware/tools/run_host_test.sh`.
 4. Within 5 minutes the device installs it. If the new version can't fetch
    screens, it rolls back to the old one after a reset.
 
+## Birthday animation
+
+The birthday sequence contains family photos, and this repo is public, so the
+frames are kept out of git. They live in Supabase (`ticker.asset`, id
+`birthday`), and the server serves them only to the device and the settings
+page. To rebuild it from the handoff folder (`timeline.json` plus `frames/`):
+
+```bash
+cd server && python3 tools/build-animation.py <handoff-dir> birthday.tka --photo-gamma 1.8 --photo-scale 0.8 --photo-gamma-mode luma --photo-black 24 --photo-dark-desat 72
+```
+
+These are the current settings (2026-11-24). They darken the photo montage
+for the LEDs: brightness-only gamma, so colours don't get exaggerated, plus
+80% brightness so faces don't wash out. Upload the result with the
+`ticker.put_asset(TICKER_DB_SECRET, 'birthday', <base64>)` database function.
+The server picks it up within 10 minutes and the device within 2 more.
+
+On firmware 4 or later, `--photo-black 16 --photo-dark-desat 56` keeps more
+shadow detail, with no stray-colour specks.
+
 ## Milestone 1: panel test
 
 ### Flash it
