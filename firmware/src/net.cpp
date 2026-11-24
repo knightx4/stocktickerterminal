@@ -17,8 +17,9 @@ namespace {
 
 SemaphoreHandle_t bundleMutex;
 Bundle* current = nullptr;   // owned by the net task; display reads it under the mutex
-Animation* currentAnim = nullptr;  // same rules as `current`
-uint32_t nextAnimTryMs = 0;        // back-off after a failed animation download
+constexpr int kMaxAnims = 3;          // birthday + a bell, with room to spare
+Animation* anims[kMaxAnims] = {};     // same rules as `current`
+uint32_t nextAnimTryMs = 0;           // back-off after a failed animation download
 String lastError;
 WiFiManager wm;
 
@@ -183,42 +184,49 @@ bool fetchBundle() {
 
 // ---------------------------------------------------------------- animations
 
-// Downloads the animation an animation screen refers to, if we don't already
-// have that exact one (matched by CRC). Kept in PSRAM only.
-void ensureAnimation() {
-  Bundle* b = current;  // only this task replaces bundles
-  if (!b) return;
-  const Screen* s = nullptr;
-  for (int i = 0; i < b->screenCount; i++)
-    if (b->screens[i].kind == kScreenAnimation) { s = &b->screens[i]; break; }
-  if (!s) return;
-  if (currentAnim && currentAnim->crc == s->assetCrc) return;
-  if (nextAnimTryMs && (int32_t)(millis() - nextAnimTryMs) < 0) return;
-  nextAnimTryMs = millis() + 5UL * 60 * 1000;  // retry in 5 min if this fails
+// Animations the current bundle refers to (birthday screen, bell events),
+// downloaded once each and kept in PSRAM only, matched by CRC.
 
+bool animWanted(const Bundle* b, uint32_t crc) {
+  if (!b) return false;
+  for (int i = 0; i < b->screenCount; i++)
+    if (b->screens[i].kind == kScreenAnimation && b->screens[i].assetCrc == crc) return true;
+  for (int i = 0; i < b->eventCount; i++)
+    if (b->events[i].assetCrc == crc) return true;
+  return false;
+}
+
+bool animHave(uint32_t crc) {
+  for (Animation* a : anims)
+    if (a && a->crc == crc) return true;
+  return false;
+}
+
+// Downloads one animation; returns it (owned by caller) or nullptr.
+Animation* downloadAnimation(const char* id, uint32_t wantCrc, uint32_t wantSize) {
   WiFiClientSecure client;
   client.setInsecure();  // TODO: pin a root CA (same as fetchBundle)
   HTTPClient http;
   http.setConnectTimeout(cfg::kHttpTimeoutMs);
   http.setTimeout(cfg::kHttpTimeoutMs);
-  String url = String(SERVER_URL) + "/api/asset?id=" + s->assetId + "&t=" + DEVICE_TOKEN;
-  if (!http.begin(client, url)) { setError("asset: bad URL"); return; }
+  String url = String(SERVER_URL) + "/api/asset?id=" + id + "&t=" + DEVICE_TOKEN;
+  if (!http.begin(client, url)) { setError("asset: bad URL"); return nullptr; }
   int code = http.GET();
   if (code != 200) {
-    setError("asset: HTTP " + String(code));
+    setError("asset " + String(id) + ": HTTP " + String(code));
     http.end();
-    return;
+    return nullptr;
   }
   BufferStream body;
   body.limit = kMaxAssetBytes;
   int written = http.writeToStream(&body);
   http.end();
-  if (written < 0 || body.overflow || body.len != s->assetSize) {
-    setError("asset: read " + String(body.len) + " of " + String(s->assetSize));
-    return;
+  if (written < 0 || body.overflow || body.len != wantSize) {
+    setError("asset " + String(id) + ": read " + String(body.len) + " of " + String(wantSize));
+    return nullptr;
   }
   uint32_t crc = crc32Of(body.buf, body.len);
-  if (crc != s->assetCrc) { setError("asset: checksum mismatch"); return; }
+  if (crc != wantCrc) { setError("asset " + String(id) + ": checksum mismatch"); return nullptr; }
 
   size_t len = body.len;
   uint8_t* data = body.release();
@@ -227,20 +235,59 @@ void ensureAnimation() {
   if (!parseAnimation(data, len, *a, err)) {
     free(data);
     delete a;
-    setError("asset: " + err);
-    return;
+    setError("asset " + String(id) + ": " + err);
+    return nullptr;
   }
   a->crc = crc;
-  strlcpy(a->id, s->assetId, sizeof a->id);
-
-  xSemaphoreTake(bundleMutex, portMAX_DELAY);
-  Animation* old = currentAnim;
-  currentAnim = a;
-  xSemaphoreGive(bundleMutex);
-  if (old) { freeAnimation(old); delete old; }
-  nextAnimTryMs = 0;
+  strlcpy(a->id, id, sizeof a->id);
   Serial.printf("[net] Animation '%s' ready: %u frames, %u ms, %u bytes\n", a->id, a->count,
                 (unsigned)a->totalMs, (unsigned)len);
+  return a;
+}
+
+void ensureAnimations() {
+  Bundle* b = current;  // only this task replaces bundles
+  if (!b) return;
+
+  // Drop animations the bundle no longer mentions (e.g. a bell after it rang).
+  for (Animation*& slot : anims) {
+    if (slot && !animWanted(b, slot->crc)) {
+      xSemaphoreTake(bundleMutex, portMAX_DELAY);
+      Animation* old = slot;
+      slot = nullptr;
+      xSemaphoreGive(bundleMutex);
+      freeAnimation(old);
+      delete old;
+    }
+  }
+
+  if (nextAnimTryMs && (int32_t)(millis() - nextAnimTryMs) < 0) return;
+
+  // Events first: they ring at a fixed time, so they are the urgent ones.
+  struct Want { const char* id; uint32_t crc, size; } wants[kMaxEvents + kMaxScreens];
+  int n = 0;
+  for (int i = 0; i < b->eventCount; i++)
+    wants[n++] = {b->events[i].assetId, b->events[i].assetCrc, b->events[i].assetSize};
+  for (int i = 0; i < b->screenCount; i++)
+    if (b->screens[i].kind == kScreenAnimation)
+      wants[n++] = {b->screens[i].assetId, b->screens[i].assetCrc, b->screens[i].assetSize};
+
+  for (int i = 0; i < n; i++) {
+    if (animHave(wants[i].crc)) continue;
+    int free_slot = -1;
+    for (int k = 0; k < kMaxAnims; k++)
+      if (!anims[k]) { free_slot = k; break; }
+    if (free_slot < 0) return;  // full; wait for the next bundle to release one
+    Animation* a = downloadAnimation(wants[i].id, wants[i].crc, wants[i].size);
+    if (!a) {
+      nextAnimTryMs = millis() + 60UL * 1000;  // retry in a minute
+      return;
+    }
+    xSemaphoreTake(bundleMutex, portMAX_DELAY);
+    anims[free_slot] = a;
+    xSemaphoreGive(bundleMutex);
+  }
+  nextAnimTryMs = 0;
 }
 
 // ---------------------------------------------------------------- Wi-Fi
@@ -291,7 +338,7 @@ void netTask(void*) {
     if (connected) {
       if ((int32_t)(now - nextFetchMs) >= 0) {
         if (fetchBundle()) {
-          ensureAnimation();
+          ensureAnimations();
           Bundle* b = current;
           nextFetchMs = millis() + (b ? b->pollSeconds * 1000UL : cfg::kDefaultPollMs);
           retryDelayMs = cfg::kRetryMinMs;
@@ -352,7 +399,11 @@ void netBegin(bool forcePortal) {
   xTaskCreatePinnedToCore(netTaskEntry, "net", 16384, (void*)forcePortal, 1, nullptr, 0);
 }
 
-const Animation* lockedAnimation() { return currentAnim; }
+const Animation* lockedAnimation(uint32_t crc) {
+  for (Animation* a : anims)
+    if (a && a->crc == crc) return a;
+  return nullptr;
+}
 
 Bundle* lockBundle() {
   xSemaphoreTake(bundleMutex, portMAX_DELAY);

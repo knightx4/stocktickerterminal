@@ -3,6 +3,7 @@
 // git. The device downloads one once via /api/asset and plays it itself.
 import { crc32 } from "node:zlib";
 import { dbGetAsset } from "./db.js";
+import { parseBellId, renderBell } from "./bell.js";
 
 // Parses a TKA1 buffer into a frame index. Throws on malformed data.
 export function parseAnimation(buf) {
@@ -50,7 +51,8 @@ export async function loadAnimation(id) {
   const hit = cache.get(id);
   if (hit && Date.now() - hit.at < TTL_MS) return hit.value;
   try {
-    const buf = await dbGetAsset(id);
+    // Bells are generated from their id; everything else comes from the database.
+    const buf = parseBellId(id) ? renderBell(id) : await dbGetAsset(id);
     const value = buf ? { id, buf, crc: crc32(buf) >>> 0, size: buf.length, index: parseAnimation(buf) } : null;
     cache.set(id, { at: Date.now(), value });
     return value;

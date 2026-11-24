@@ -55,14 +55,18 @@ bool parseBundle(uint8_t* data, size_t size, Bundle& out, String& error) {
   b.autoplayMinutes = r.u8();
   r.bytes(5);  // reserved
   if (!r.ok) { error = "short header"; return false; }
-  if (b.screenCount == 0 || b.screenCount > kMaxScreens) {
+  if (b.screenCount == 0 || b.screenCount > kMaxScreens + kMaxEvents) {
     error = "bad screen count " + String(b.screenCount);
     return false;
   }
   if (b.pollSeconds < 10) b.pollSeconds = 10;  // protect the server from a bad value
 
-  for (int i = 0; i < b.screenCount; i++) {
-    Screen& s = b.screens[i];
+  // The header counts every entry; timed events (kind 2) go to b.events,
+  // the rest to b.screens.
+  int entries = b.screenCount;
+  b.screenCount = 0;
+  for (int i = 0; i < entries; i++) {
+    Screen s;
     uint8_t idLen = r.u8();
     const uint8_t* id = r.bytes(idLen);
     if (!r.ok) break;
@@ -77,7 +81,7 @@ bool parseBundle(uint8_t* data, size_t size, Bundle& out, String& error) {
     s.stripW = r.u16();
     s.scrollSpeed = r.u8();
     s.kind = r.u8();
-    if (s.kind != kScreenStill && s.kind != kScreenAnimation) {
+    if (s.kind > kScreenEvent) {
       error = "unknown screen kind " + String(s.kind);
       return false;
     }
@@ -92,22 +96,38 @@ bool parseBundle(uint8_t* data, size_t size, Bundle& out, String& error) {
     }
     s.assetCrc = s.assetSize = 0;
     s.assetId[0] = 0;
-    if (s.kind == kScreenAnimation) {
+    uint32_t playAt = 0;
+    if (s.kind == kScreenAnimation || s.kind == kScreenEvent) {
       s.assetCrc = r.u32();
       s.assetSize = r.u32();
-      uint8_t n = r.u8();
-      const uint8_t* aid = r.bytes(n);
+      uint8_t an = r.u8();
+      const uint8_t* aid = r.bytes(an);
+      if (s.kind == kScreenEvent) playAt = r.u32();
       if (!r.ok) break;
-      if (n == 0 || n >= sizeof(s.assetId) || s.assetSize == 0 || s.assetSize > kMaxAssetBytes) {
+      if (an == 0 || an >= sizeof(s.assetId) || s.assetSize == 0 || s.assetSize > kMaxAssetBytes) {
         error = "bad animation on screen " + String(i);
         return false;
       }
-      memcpy(s.assetId, aid, n);
-      s.assetId[n] = 0;
+      memcpy(s.assetId, aid, an);
+      s.assetId[an] = 0;
     }
     if (s.clockX != 255 && (s.clockX > 63 || s.clockY > 27)) s.clockX = 255;  // ignore off-screen clock
+
+    if (s.kind == kScreenEvent) {
+      if (b.eventCount < kMaxEvents) {
+        Event& e = b.events[b.eventCount++];
+        e.assetCrc = s.assetCrc;
+        e.assetSize = s.assetSize;
+        e.playAt = playAt;
+        strncpy(e.assetId, s.assetId, sizeof e.assetId);
+      }
+    } else {
+      if (b.screenCount >= kMaxScreens) { error = "too many screens"; return false; }
+      b.screens[b.screenCount++] = s;
+    }
   }
   if (!r.ok) { error = "truncated screens"; return false; }
+  if (b.screenCount == 0) { error = "no screens"; return false; }
   if (r.pos != size) { error = "trailing bytes"; return false; }
 
   b.data = data;

@@ -76,3 +76,34 @@ test("birthday autoplay only on Nov 27 in his time zone", () => {
   assert.equal(isBirthday(c, new Date("2026-11-28T03:00:00Z")), true); // 9 pm CT Nov 27
   assert.equal(isBirthday(c, new Date("2026-11-28T07:00:00Z")), false); // 1 am CT Nov 28
 });
+
+test("bell events: scheduled around 9:30 / 4:00 ET on trading days, kind 2 with play time", async () => {
+  const { bellTimes } = await import("../lib/hours.js");
+  const { bellEvents } = await import("../lib/bundle.js");
+  // Tue Nov 24 2026: 9:30 ET = 14:30 UTC, 4:00 pm ET = 21:00 UTC
+  const [open, close] = bellTimes(new Date("2026-11-24T12:00:00Z"));
+  assert.equal(open.playAt, Date.UTC(2026, 10, 24, 14, 30) / 1000);
+  assert.equal(close.playAt, Date.UTC(2026, 10, 24, 21, 0) / 1000);
+  // Fri Nov 27 is an early close (1:00 pm ET = 18:00 UTC); Thanksgiving has none
+  assert.equal(bellTimes(new Date("2026-11-27T12:00:00Z"))[1].playAt, Date.UTC(2026, 10, 27, 18, 0) / 1000);
+  assert.deepEqual(bellTimes(new Date("2026-11-26T15:00:00Z")), []);
+
+  const config = sanitizeConfig({ ...DEFAULT_CONFIG, screens: [{ id: "ticker", enabled: true }] });
+  const quotes = { SPY: { pct: 0.8412 } };
+  assert.equal((await bellEvents(config, new Date("2026-11-24T12:00:00Z"), quotes)).length, 0, "nothing at 7 am");
+  const before = await bellEvents(config, new Date("2026-11-24T14:20:00Z"), quotes);
+  assert.deepEqual(before.map((e) => e.id), ["bell-o"]);
+  const atClose = await bellEvents(config, new Date("2026-11-24T20:55:00Z"), quotes);
+  assert.deepEqual(atClose.map((e) => e.id), ["bell-c+0.84"]);
+  const off = sanitizeConfig({ ...config, display: { ...config.display, bells: false } });
+  assert.equal((await bellEvents(off, new Date("2026-11-24T14:20:00Z"), quotes)).length, 0);
+
+  // encoded as kind 2, only for firmware 5+
+  const now = new Date("2026-11-24T14:20:00Z");
+  const v5 = decodeBundle(new Uint8Array(encodeBundle(await buildScreens({ now, config, fw: 5 }), now)));
+  const ev = v5.screens.find((s) => s.kind === 2);
+  assert.equal(ev.assetId, "bell-o");
+  assert.equal(ev.playAt, open.playAt);
+  const v4 = decodeBundle(new Uint8Array(encodeBundle(await buildScreens({ now, config, fw: 4 }), now)));
+  assert.ok(!v4.screens.some((s) => s.kind === 2), "firmware 4 never sees events");
+});

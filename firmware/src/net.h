@@ -29,8 +29,9 @@ void netBegin(bool forcePortal);
 Bundle* lockBundle();
 void unlockBundle();
 
-// The downloaded animation, or nullptr. Only valid while the bundle lock is held.
-const Animation* lockedAnimation();
+// The downloaded animation with this CRC, or nullptr. Only valid while the
+// bundle lock is held.
+const Animation* lockedAnimation(uint32_t crc);
 
 // Last error text, for the heartbeat.
 String netLastError();

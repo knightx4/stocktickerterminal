@@ -165,6 +165,8 @@
     <input type="range" min="5" max="60" data-bind="display.scrollSpeed" data-type="number">
     <div class="row" style="margin-top:12px"><input type="checkbox" data-bind="display.clock24h"><span>24-hour clock</span></div>
     <div class="row"><input type="checkbox" data-bind="display.doubleTap"><span>Double-tap the case to change screens</span></div>
+    <div class="row"><input type="checkbox" data-bind="display.bells"><span>Opening and closing bell animations (9:30 and 4:00 ET, trading days)</span></div>
+    <div class="row" style="margin-top:10px"><button id="testBell">Ring a test bell on the ticker</button><span class="sub grow" id="testBellMsg"></span></div>
   </section>
 
   <section class="card">
@@ -349,6 +351,15 @@ function changed() {
   clearTimeout(previewTimer); previewTimer = setTimeout(refreshPreview, 600);
 }
 
+$("testBell").onclick = async () => {
+  $("testBellMsg").textContent = "Scheduling…";
+  const res = await api("/api/testbell", { method: "POST" });
+  const data = await res.json();
+  if (!res.ok) { $("testBellMsg").textContent = data.error || "Failed"; return; }
+  const at = new Date(data.testBellAt * 1000);
+  $("testBellMsg").textContent = `It will ring at ${at.toLocaleTimeString([], { hour: "numeric", minute: "2-digit", second: "2-digit" })} (needs firmware 5).`;
+};
+
 $("revert").onclick = () => { draft = structuredClone(saved); renderAll(); changed(); };
 $("save").onclick = async () => {
   $("save").disabled = true; $("saveState").textContent = "Saving…";
@@ -382,7 +393,8 @@ function renderTabs() {
   bundle.screens.forEach((s, i) => {
     const b = document.createElement("button");
     b.textContent = s.id.replace(/^message(\d*)$/, (_, n) => `Message ${n || 1}`).replace("since1968", "Since 1968").replace(/^\w/, (c) => c.toUpperCase());
-    if (s.kind === 1) ensureAnimation(s.assetId);
+    if (s.kind === 2) b.textContent = s.assetId === "bell-o" ? "Opening bell" : "Closing bell";
+    if (s.kind === 1 || s.kind === 2) ensureAnimation(s.assetId);
     if (i === current) b.className = "on";
     b.onclick = () => { current = i; shownAt = performance.now(); renderTabs(); };
     box.appendChild(b);
@@ -397,7 +409,7 @@ function draw() {
   const secs = (performance.now() - fetchedAt) / 1000;
   const offset = s.speed && s.stripW > 64 ? Math.floor(secs * s.speed) % s.stripW : 0;
   const header = { ...bundle.header, time: bundle.header.time + Math.floor(secs) };
-  const anim = s.kind === 1 ? animations[s.assetId] : null;
+  const anim = s.kind === 1 || s.kind === 2 ? animations[s.assetId] : null;
   const px = anim && anim !== "loading" ? animationFrameAt(anim, performance.now() - shownAt) : composite(s, header, offset);
   const scale = 10, bright = Math.max(0.25, bundle.header.brightness / 255);
   ctx.fillStyle = "#050505"; ctx.fillRect(0, 0, 640, 320);

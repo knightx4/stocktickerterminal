@@ -32,6 +32,14 @@ struct Screen {
 
 constexpr uint8_t kScreenStill = 0;
 constexpr uint8_t kScreenAnimation = 1;
+constexpr uint8_t kScreenEvent = 2;  // timed one-shot animation (bells), not in the screen cycle
+constexpr int kMaxEvents = 4;
+
+// A timed event: play animation assetId once at playAt (unix seconds).
+struct Event {
+  uint32_t assetCrc, assetSize, playAt;
+  char assetId[17];
+};
 constexpr uint32_t kMaxAssetBytes = 1536 * 1024;  // fits comfortably in the 2 MB PSRAM
 
 struct Bundle {
@@ -48,7 +56,9 @@ struct Bundle {
   uint32_t serverTime = 0;
   int16_t utcOffsetMin = 0;
   uint8_t autoplayMinutes = 0;  // >0: play the animation screen on its own this often
-  Screen screens[kMaxScreens];
+  Screen screens[kMaxScreens];  // the Up/Down cycle (kinds 0 and 1)
+  uint8_t eventCount = 0;
+  Event events[kMaxEvents];     // kind 2 entries
 
   uint32_t fetchedAtMs = 0; // millis() when received
   bool fromCache = false;   // loaded from flash at boot: time and freshness unknown

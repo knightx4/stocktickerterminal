@@ -45,9 +45,40 @@ int findAnimationScreen(const Bundle& b) {
   return -1;
 }
 
-// The animation for screen s, if it's downloaded and matches.
-const Animation* animationFor(const Screen& s, const Animation* a) {
-  return s.kind == kScreenAnimation && a && a->crc == s.assetCrc ? a : nullptr;
+// The animation for screen s, if it's downloaded. Call with the bundle locked.
+const Animation* animationFor(const Screen& s) {
+  return s.kind == kScreenAnimation ? lockedAnimation(s.assetCrc) : nullptr;
+}
+
+// Timed events (opening/closing bell): played once, at their time, over
+// whatever screen is showing; then that screen simply continues.
+constexpr uint32_t kEventLateSeconds = 90;  // still play if we're up to this late
+uint32_t eventCrc = 0;        // event animation playing now (0 = none)
+uint32_t eventStartMs = 0;
+uint32_t lastEventPlayAt = 0;  // so each event plays only once
+
+// Current unix time from the bundle (server time + elapsed), or -1 if unknown.
+int64_t unixNow(const Bundle& b) {
+  if (b.fromCache || !b.serverTime) return -1;
+  return (int64_t)b.serverTime + (millis() - b.fetchedAtMs) / 1000;
+}
+
+// Starts a due event if there is one. Call with the bundle locked.
+void checkEvents(const Bundle& b) {
+  if (eventCrc) return;
+  int64_t t = unixNow(b);
+  if (t < 0) return;
+  for (int i = 0; i < b.eventCount; i++) {
+    const Event& e = b.events[i];
+    if (!e.playAt || e.playAt == lastEventPlayAt) continue;
+    if (t < e.playAt || t >= (int64_t)e.playAt + kEventLateSeconds) continue;
+    if (!lockedAnimation(e.assetCrc)) continue;  // not downloaded (yet)
+    eventCrc = e.assetCrc;
+    eventStartMs = millis();
+    lastEventPlayAt = e.playAt;
+    Serial.printf("[main] Playing event '%s'\n", e.assetId);
+    return;
+  }
 }
 
 void startWatchdog() {
@@ -88,7 +119,7 @@ void followScreen(const Bundle& b) {
   showScreen(min(screenIndex, b.screenCount - 1), b);
 }
 
-void handleInput(InputEvent ev, const Bundle& b, const Animation* anim) {
+void handleInput(InputEvent ev, const Bundle& b) {
   uint32_t now = millis();
   bool tap = ev == InputEvent::Tap && (b.flags & kFlagDoubleTap);
   if (ev == InputEvent::Next || ev == InputEvent::Previous || tap) {
@@ -100,7 +131,7 @@ void handleInput(InputEvent ev, const Bundle& b, const Animation* anim) {
   bool paused = lastButtonMs && now - lastButtonMs < cfg::kButtonPauseMs;
 
   // Autoplay finished: return to the screen we were on.
-  const Animation* playing = animationFor(b.screens[screenIndex], anim);
+  const Animation* playing = animationFor(b.screens[screenIndex]);
   if (returnId[0] && playing && now - screenShownMs >= playing->totalMs) {
     int back = findScreen(b, returnId);
     returnId[0] = 0;
@@ -110,7 +141,7 @@ void handleInput(InputEvent ev, const Bundle& b, const Animation* anim) {
   // Time for an autoplay (only while the server says it's the day).
   int animIdx = findAnimationScreen(b);
   if (b.autoplayMinutes && animIdx >= 0 && animIdx != screenIndex && !paused && !returnId[0] &&
-      animationFor(b.screens[animIdx], anim) &&
+      animationFor(b.screens[animIdx]) &&
       (!lastAutoplayMs || now - lastAutoplayMs >= b.autoplayMinutes * 60000UL)) {
     lastAutoplayMs = now;
     strlcpy(returnId, b.screens[screenIndex].id, sizeof returnId);
@@ -184,13 +215,23 @@ void loop() {
       lastBundle = b;
       lastBundleCrc = b->crc;
     }
-    const Animation* anim = lockedAnimation();
-    handleInput(ev, *b, anim);
-    const Animation* playing = animationFor(b->screens[screenIndex], anim);
+    checkEvents(*b);
+    const Animation* event = eventCrc ? lockedAnimation(eventCrc) : nullptr;
+    bool pressed = ev == InputEvent::Next || ev == InputEvent::Previous ||
+                   (ev == InputEvent::Tap && (b->flags & kFlagDoubleTap));
+    if (eventCrc && (!event || now - eventStartMs >= event->totalMs || pressed)) {
+      eventCrc = 0;  // finished, dropped, or a button/tap dismissed it
+      event = nullptr;
+      ev = InputEvent::None;  // the press only dismisses the bell
+    }
+    handleInput(ev, *b);
+    const Animation* playing = animationFor(b->screens[screenIndex]);
     if (netStatus.updating) {
       displayText("UPDATING", "firmware", "please", "wait", b->brightness);
     } else if (netStatus.portalActive && now % 15000 < 5000) {
       showSetupHelp();  // alternate with the data so it's never hidden
+    } else if (event) {
+      displayAnimation(*event, now - eventStartMs, b->brightness);
     } else if (playing) {
       displayAnimation(*playing, now - screenShownMs, b->brightness);
     } else if (b->screens[screenIndex].kind == kScreenAnimation) {

@@ -36,12 +36,13 @@ export function decodeBundle(buf) {
     for (let p = 0; p < 2048; p++, o += 2) s.bg[p] = dv.getUint16(o, true);
     s.strip = new Uint16Array(s.stripW * s.stripH);
     for (let p = 0; p < s.strip.length; p++, o += 2) s.strip[p] = dv.getUint16(o, true);
-    if (s.kind === 1) {
+    if (s.kind === 1 || s.kind === 2) {
       s.assetCrc = dv.getUint32(o, true);
       s.assetSize = dv.getUint32(o + 4, true);
       const n = dv.getUint8(o + 8);
       s.assetId = String.fromCharCode(...buf.subarray(o + 9, o + 9 + n));
       o += 9 + n;
+      if (s.kind === 2) { s.playAt = dv.getUint32(o, true); o += 4; }
     }
     screens.push(s);
   }

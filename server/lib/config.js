@@ -29,6 +29,8 @@ export const DEFAULT_CONFIG = {
     scrollSpeed: 20,
     clock24h: false,
     doubleTap: true,
+    bells: true,
+    testBellAt: 0, // unix seconds: ring a test bell then (set from the settings page)
   },
   firmware: { version: 0, url: "", md5: "" },
 };
@@ -94,6 +96,8 @@ export function sanitizeConfig(input) {
       scrollSpeed: num(d.scrollSpeed, 5, 60, D.display.scrollSpeed),
       clock24h: bool(d.clock24h, false),
       doubleTap: bool(d.doubleTap, true),
+      bells: bool(d.bells, true),
+      testBellAt: Math.round(num(d.testBellAt, 0, 4e9, 0)),
     },
     firmware: {
       version: Math.round(num(fw.version, 0, 65535, 0)),

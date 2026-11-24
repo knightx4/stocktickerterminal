@@ -69,6 +69,21 @@ export function pollSeconds(status) {
   return status === "open" ? 60 : 120;
 }
 
+// Unix seconds of today's opening and closing bell (ET), or [] when the
+// market doesn't open today. Early-close days ring at 1:00 pm.
+export function bellTimes(now = new Date()) {
+  const et = zonedParts(now, "America/New_York");
+  if (et.weekday === "Sat" || et.weekday === "Sun" || NYSE_HOLIDAYS.has(et.ymd)) return [];
+  const [y, m, d] = et.ymd.split("-").map(Number);
+  const offset = utcOffsetMinutes(now, "America/New_York");
+  const at = (h, min) => (Date.UTC(y, m - 1, d, h, min) - offset * 60000) / 1000;
+  const early = NYSE_EARLY_CLOSE.has(et.ymd);
+  return [
+    { kind: "open", playAt: at(9, 30) },
+    { kind: "close", playAt: early ? at(13, 0) : at(16, 0), label: early ? "1:00 ET" : "4:00 ET" },
+  ];
+}
+
 // "22:00" -> 1320
 export function hhmmToMinutes(s, fallback) {
   const m = /^(\d{1,2}):(\d{2})$/.exec(s || "");
