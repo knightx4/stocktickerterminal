@@ -31,6 +31,10 @@ ap.add_argument("--photo-gamma-mode", choices=["channel", "luma"], default="chan
 ap.add_argument("--photo-min-colors", type=int, default=48)
 ap.add_argument("--photo-black", type=int, default=0,
                 help="after gamma, pixels whose brightest channel is below this become pure black")
+ap.add_argument("--ticker-green-frames", default="",
+                help="e.g. 0-96: in these frames, recolour the handoff's teal green "
+                     "(40,220,110) and its dark chart fill (8,60,30) to the real ticker's "
+                     "green (0,255,0) and Since '68 chart fill, keeping fade levels")
 ap.add_argument("--photo-dark-desat", type=int, default=0,
                 help="pixels darker than this are pulled toward grey, so LED rounding can't tint them")
 args = ap.parse_args()
@@ -69,6 +73,24 @@ def apply_gamma(im):
     return im
 
 
+def ticker_green(im):
+    """Teal pixels have blue = half of green. The bright family (line, arrow,
+    text) has red ~0.18 x green; the chart fill has red ~0.13 x green."""
+    out = []
+    for r, g, b in list(im.get_flattened_data()) if hasattr(im, "get_flattened_data") else list(im.getdata()):
+        if g > r and g >= 8 and abs(2 * b - g) <= 3:
+            if r / g >= 0.155:   # (40,220,110) and its fades
+                out.append((0, min(255, round(255 * g / 220)), 0))
+            else:                # chart fill (8,60,30) and its fades
+                k = g / 60
+                out.append((0, round(72 * k), round(24 * k)))
+        else:
+            out.append((r, g, b))
+    im = im.copy()
+    im.putdata(out)
+    return im
+
+
 def clean_darks(im):
     """At the bottom of the range an LED channel has only a few steps, so a
     dark pixel's hue is mostly rounding error: it shows as a red or green dot.
@@ -91,11 +113,19 @@ def clean_darks(im):
     im.putdata(out)
     return im
 
+if args.ticker_green_frames:
+    a, b = (int(v) for v in args.ticker_green_frames.split("-"))
+    green_range = range(a, b + 1)
+else:
+    green_range = range(0)
+
 body = bytearray()
 raw_total = 0
 photo_frames = 0
 for idx, (f, im) in enumerate(zip(t["frames"], images)):
     assert im.size == (64, 32), f["file"]
+    if idx in green_range:
+        im = ticker_green(im)
     if idx in photo_range:
         im = clean_darks(apply_gamma(im))
         photo_frames += 1

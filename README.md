@@ -91,7 +91,7 @@ frames are kept out of git. They live in Supabase (`ticker.asset`, id
 page. To rebuild it from the handoff folder (`timeline.json` plus `frames/`):
 
 ```bash
-cd server && python3 tools/build-animation.py <handoff-dir> birthday.tka --photo-gamma 1.8 --photo-scale 0.8 --photo-gamma-mode luma --photo-black 16 --photo-dark-desat 56
+cd server && python3 tools/build-animation.py <handoff-dir> birthday.tka --photo-gamma 1.8 --photo-scale 0.8 --photo-gamma-mode luma --photo-black 16 --photo-dark-desat 56 --ticker-green-frames 0-96
 ```
 
 These are the current settings (2026-11-24). They darken the photo montage
